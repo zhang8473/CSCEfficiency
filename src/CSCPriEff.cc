@@ -15,7 +15,7 @@
 // $Id: CSCPriEff.cc,v 1.2 2010/07/12 14:40:37 zhangjin Exp $
 //
 //
-#define LocalRun
+//#define LocalRun
 //#define FilterOnly
 #include "../interface/CSCPriEff.h"
 
@@ -130,7 +130,18 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
   Handle<edm::HepMCProduct> HepMCH;
   event.getByLabel(HepMCTag, HepMCH);
   HepMC::GenEvent * HepGenEvent = new HepMC::GenEvent(*(HepMCH->GetEvent()));
-  HepParticleBegin=*HepGenEvent->particles_begin();
+  HepMC::GenEvent::particle_iterator GenParticle_iter = HepGenEvent->particles_begin();
+  for (;GenParticle_iter != HepGenEvent->particles_end();GenParticle_iter++) { 
+    HepMC::GenVertex *thisVtx=(*GenParticle_iter)->production_vertex();
+    if (thisVtx) {
+      HepMCFourVec[0]=thisVtx->position().x()/10.;
+      HepMCFourVec[1]=thisVtx->position().y()/10.;
+      HepMCFourVec[2]=thisVtx->position().z()/10.;
+      HepMCFourVec[3]=thisVtx->position().t()/299.792458;
+      break;
+    }
+  }
+  if (GenParticle_iter == HepGenEvent->particles_end()) {ReportError(7,"No HepMC(Core) Vertex Information")}
 
   //Reco Tracks
   Handle<reco::TrackCollection> trackCollectionH;
@@ -187,6 +198,7 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
       vz->push_back(v->z());	   vzError->push_back(v->zError());
     }
   else if (FirstEntry) {ReportError(1,PrimaryVerticesTag.c_str()<<" information is not valid.")}
+
   for ( reco::MuonCollection::const_iterator iter = muons.begin(); iter != muons.end() ; ++iter)
     //muon loop begin
     if (iter->isTrackerMuon()||iter->isGlobalMuon()) {
@@ -359,12 +371,12 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
 		}
 	      }//g4Track loop end
 	      Long64_t TypeRecord=0;
-	      for (vector <Byte_t>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
+	      /*for (vector <Byte_t>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
 		if (*type_iter/10==5) 
 		  for (vector <Byte_t>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
-		    if (*type_iter/10==3||*type_iter/10==4) *type_iter=0;
+		  if (*type_iter/10==3||*type_iter/10==4) *type_iter=0;*/
 	      for (vector <Byte_t>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
-		TypeRecord=TypeRecord*100+(*type_iter);
+		if (*type_iter) TypeRecord=TypeRecord*100+(*type_iter);
 	      MuonType->push_back(TypeRecord);
 	      break;
 	    }
@@ -387,13 +399,19 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
       }
     }//muon loop end
 #ifdef LocalRun
-  bool DuplicateMu=false;
-  for (vector<Int_t>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end(); DChain_iter++ )
+  bool Print=false;
+  /*for (vector<Int_t>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end(); DChain_iter++ )
     if (*DChain_iter==-2) 
       for (vector<Int_t>::iterator DChain_iter2 = DChain_iter+1; DChain_iter2 != DChains->end()&&*DChain_iter2!=-2; DChain_iter2++ )
 	  for (vector<Int_t>::iterator DChain_iter3 = DChains->begin(); DChain_iter3 != DChain_iter; DChain_iter3++ )
-	    if (*DChain_iter2==*DChain_iter3&&*DChain_iter2>0) DuplicateMu=true;
-  if (pt->size()>1&&DuplicateMu) {
+	    if (*DChain_iter2==*DChain_iter3&&*DChain_iter2>0) Print=true;
+  */
+  int muref=-1;
+  for (vector<Int_t>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end(); DChain_iter++ ) {
+    if (*DChain_iter==-2) muref++;
+    if ((*MuonType)[muref]==21) {Print=true;break;}
+  }
+  if (Print) {
     cout<<"Run "<<Info.RUN<<"; Event "<<Info.EVENT<<endl;
     for (unsigned int parref = 0; parref<Gen_pdgId->size(); parref++)
       printf("%d: %d (%3.2fcm,%3.2fcm,%3.2fcm,%3.2fns) ---(%3.2fGeV/c,%3.2f,%3.2f)---> %s;\n",parref,Gen_pdgId->at(parref),Gen_vx->at(parref),Gen_vy->at(parref),Gen_vz->at(parref),Gen_vt->at(parref),Gen_pt->at(parref)*cosh(Gen_eta->at(parref)),Gen_eta->at(parref),Gen_phi->at(parref),IsParInHep->at(parref)?"HEPMC":"SimTrk");
@@ -434,7 +452,10 @@ CSCPriEff::ParticleType CSCPriEff::ParticleCata(int pid)
       if (pid>500&&pid<550) return BottomMeson;
       if (pid>550&&pid<600) return bbarMeson;
     }
-  if (pid>1000&&(pid%100)/10>0) return Baryon;
+  if (pid>1111&&pid<3350&&(pid%100)/10>0) return LightBaryon;
+  if (pid>4111&&pid<4450&&(pid%100)/10>0) return CharmedBaryon;
+  if (pid>5111&&pid<5560&&(pid%100)/10>0) return BottomBaryon;
+  if (pid>1000&&pid<6000&&(pid%100)/10==0) return DiQuarks;
   if (pid>10&&pid<19) return Lepton;
   return Other;
 }
@@ -442,15 +463,17 @@ CSCPriEff::ParticleType CSCPriEff::ParticleCata(int pid)
 //classification tracker muons
 //21-prompt Mu from LightMeson
 //22-prompt Mu from HeavyMeson
-//23-prompt Mu from Baryon
-//24-prompt Mu from WZ
-//25-Mu from WZ but not prompt (should not happen)
-//26-prompt Mu from Others (should not happen)
+//23-prompt Mu from LightBaryon
+//24-prompt Mu from HeavyBaryon
+//25-prompt Mu from WZ
+//26-Mu from WZ but not prompt (should not happen)
+//27-prompt Mu from Others (should not happen)
 //30-punch through: it is a hadron and doesn't decay in the detector region
 //40-punch through and decay in flight: it is a hadron and decays outside of HCAL (including HO)
 //51-Decay in flight from LightMeson
-//52-from HeavyMeson
-//53-from Baryon
+//52-Decay in flight from HeavyMeson
+//53-Decay in flight from LightBaryon
+//54-Decay in flight from HeavyBaryon
 //60-others
 //0-no matched simulated tracks
 //number combination: duplicate decay chain types(e.g. 23 means prompt Mu from jets and a punch through )
@@ -462,22 +485,26 @@ Byte_t CSCPriEff::classification(vector<Int_t> &Chain)
     ParticleType ParType=ParticleCata(pid);
     if (abs(pid)==13) MuPos=*iter;
     if (MuPos>=0&&(ParType==W||ParType==Z)) {
-      if ((*IsParInHep)[MuPos]) return 24;
-      else return 25;
+      if ((*IsParInHep)[MuPos]) return 25;
+      else return 26;
     }
-    if (MuPos<0&&ParType>=LightMeson&&ParType<=Baryon) return 30;
-    if (MuPos>=0&&ParType>=LightMeson&&ParType<=Baryon) {//classify type 2,4,5
+    if (MuPos<0&&ParType>=LightMeson&&ParType<=BottomBaryon) return 30;
+    if (MuPos>=0&&ParType>=LightMeson&&ParType<=BottomBaryon) {
+      float deltaRPhi2=((*Gen_vx)[MuPos]-HepMCFourVec[0])*((*Gen_vx)[MuPos]-HepMCFourVec[0])+((*Gen_vy)[MuPos]-HepMCFourVec[1])*((*Gen_vy)[MuPos]-HepMCFourVec[1]);
+      float deltaZ=abs((*Gen_vz)[MuPos]-HepMCFourVec[2]);
       float RPhi2=((*Gen_vx)[MuPos])*((*Gen_vx)[MuPos])+((*Gen_vy)[MuPos])*((*Gen_vy)[MuPos]);
       float Z=abs((*Gen_vz)[MuPos]);
-      if ((*IsParInHep)[MuPos]) {//vertex region
+      if ((*IsParInHep)[MuPos]||(deltaRPhi2<9&&deltaZ<30)) {//vertex region
 	if (ParType==LightMeson) return 21;
-	if (ParType>LightMeson&&ParType<Baryon) return 22;
-	if (ParType==Baryon) return 23;
+	if (ParType>LightMeson&&ParType<LightBaryon) return 22;
+	if (ParType==LightBaryon) return 23;
+	if (ParType>LightBaryon&&ParType<=BottomBaryon) return 24;
       }
       if ((RPhi2<161604.&&Z<568.)||(RPhi2>82024.96&&RPhi2<161604.&&Z<666.)) {//inside HCAL
 	if (ParType==LightMeson) return 51;
-	if (ParType>LightMeson&&ParType<Baryon) return 52;
-	if (ParType==Baryon) return 53;
+	if (ParType>LightMeson&&ParType<LightBaryon) return 52;
+	if (ParType==LightBaryon) return 53;
+	if (ParType>LightBaryon&&ParType<=BottomBaryon) return 54;
       }
       return 40;
     }
@@ -608,6 +635,8 @@ CSCPriEff::CSCPriEff(const edm::ParameterSet& pset) {
   Tracks_Tree->Branch("Gen_pt",&Gen_pt);  Tracks_Tree->Branch("Gen_eta",&Gen_eta);  Tracks_Tree->Branch("Gen_phi",&Gen_phi);   Tracks_Tree->Branch("Gen_pdgId",&Gen_pdgId);
   Tracks_Tree->Branch("Gen_vx",&Gen_vx);  Tracks_Tree->Branch("Gen_vy",&Gen_vy);  Tracks_Tree->Branch("Gen_vz",&Gen_vz);  Tracks_Tree->Branch("Gen_vt",&Gen_vt);
   MakeVecBranch("IsParInHep",IsParInHep,Bool_t);
+  Tracks_Tree->Branch("HepMCVertex",HepMCFourVec,"HepMCVertex[4]/F");
+
   //Simulated Tracks
   TrkParticles_pt = new vector<Float_t>();  TrkParticles_eta = new vector<Float_t>(); TrkParticles_phi = new vector<Float_t>();
   TrkParticles_pdgId = new vector<Int_t>();  TrkParticles_charge = new vector<Int_t>(); MatchQuality = new vector<Double_t>();
