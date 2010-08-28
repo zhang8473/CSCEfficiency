@@ -28,9 +28,9 @@
 //Tracking Particles, Match to simulated tracks
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
 #include "DataFormats/RecoCandidate/interface/TrackAssociation.h"
-#include "SimTracker/TrackAssociation/interface/TrackAssociatorByChi2.h"
-#include "SimTracker/TrackAssociation/interface/TrackAssociatorByHits.h"
 #include "SimTracker/Records/interface/TrackAssociatorRecord.h"
+#include "SimTracker/TrackAssociation/interface/TrackAssociatorBase.h"
+#include "SimMuon/MCTruth/interface/MuonAssociatorByHits.h"
 
 //SimTracks
 #include "SimDataFormats/Track/interface/SimTrackContainer.h"
@@ -74,7 +74,7 @@ class CSCPriEff : public edm::EDFilter {
    public:
       explicit CSCPriEff(const edm::ParameterSet&);
       ~CSCPriEff();
-      enum ParticleType	{LightMeson=1,CharmedMeson=2,ccbarMeson=3,BottomMeson=4,bbarMeson=5,Baryon=6,Lepton=7,W=8,Z=9,Other=10};
+      enum ParticleType	{LightMeson=1,CharmedMeson=2,ccbarMeson=3,BottomMeson=4,bbarMeson=5,LightBaryon=6,CharmedBaryon=7,BottomBaryon=8,DiQuarks=9,Lepton=10,W=11,Z=12,Other=13};
 
    private:
       virtual void beginJob();
@@ -82,6 +82,8 @@ class CSCPriEff : public edm::EDFilter {
       virtual void HepMCParentTree(HepMC::GenParticle *);
       virtual void SimTrackDaughtersTree(SimTrack *);
       inline ParticleType ParticleCata(int);
+      inline void ClearVecs();
+      inline bool IstheSameDChain(vector<int> &,vector<int> &);
       virtual Byte_t classification(vector<Int_t> &);
       const TrackingRecHit* getHitPtr(trackingRecHit_iterator iter) const {return &**iter;}
       inline Int_t FindSimTrackRecordingPosition( Int_t ParToSimPos ) {
@@ -122,11 +124,13 @@ class CSCPriEff : public edm::EDFilter {
    vector<Bool_t> *chargeMinus,*isGlobalMu,*isTrackerMu;
    vector<Int_t> *dEdx_numberOfSaturatedMeasurements,*dEdx_numberOfMeasurements;
    //Tracks
-   string tracksTag,dEdxTag;
-   vector<UInt_t> *InnerTrack_nValidHits,*InnerTrack_nMissingHits,*InnerTrack_nBadHits;
+   edm::InputTag tracksTag;
+   string dEdxTag;
+   vector<UInt_t> *nValidTrackerHits,*nValidPixelHits,*nLostTrackerHits,*nLostPixelHits,*nBadMuonHits;
    UInt_t minTrackHits;
    //Muon Chamber Match
-   vector<Float_t> *TrackDist[4],*TrackDistErr[4];
+   vector<Float_t> *TrackDist[4],*TrackDistErr[4],*DXTrackToSegment[4],*DYTrackToSegment[4],*DXErrTrackToSegment[4],*DYErrTrackToSegment[4],*DRTrackToSegment[4],*DRErrTrackToSegment[4];
+   vector<Bool_t> *IsSegmentBelongsToTrackByDR[4],*IsSegmentBelongsToTrackByCleaning[4];
    vector<UInt_t> *StationMask,*RequiredStationMask;
    double maxChamberDist,maxChamberDistPull;
    //PrimaryVertex
@@ -142,11 +146,12 @@ class CSCPriEff : public edm::EDFilter {
    vector<Bool_t> * SelectorPassed[30],*MySelector;
    //To Get the Decay Chains
       //saved variables
+   Float_t HepMCFourVec[4];
    vector<Float_t> *Gen_pt,*Gen_eta,*Gen_phi,*Gen_vx,*Gen_vy,*Gen_vz,*Gen_vt;
    vector<Int_t> *Gen_pdgId;
    vector<Long64_t> *MuonType;//all possible chains; -1 is at the beginning of each chain; -2is at the beginning of each reco-muons;
    vector<Bool_t> *IsParInHep;
-   vector<Int_t> *DChains;
+   vector<Int_t> *DChains,*theSameWithMuon;
       //temparory variables
    string HepMCTag;
    bool ChainRecord;
@@ -155,7 +160,6 @@ class CSCPriEff : public edm::EDFilter {
    vector<Int_t> DChain;
    vector<SimTrack *> ParToSim,MaskOut;
    vector<HepMC::GenParticle *> ParToHep;
-   HepMC::GenParticle *HepParticleBegin;
    map< SimTrack *, vector<SimTrack *> > Daughters;
    vector<SimVertex> SVC;
 

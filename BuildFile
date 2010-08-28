@@ -1,0 +1,24 @@
+<use name=FWCore/Framework>
+<use name=FWCore/PluginManager>
+<use name=FWCore/ParameterSet>
+<use name=DataFormats/TrackReco>
+<use name=DataFormats/MuonReco>
+<use name=DataFormats/HepMCCandidate>
+<use name=DataFormats/VertexReco>
+<use name=DataFormats/TrackingRecHit>
+<use name=DataFormats/RecoCandidate>
+<use name=RecoVertex/VertexPrimitives>
+<use name=SimDataFormats/TrackingAnalysis>
+<use name=SimDataFormats/Vertex>
+<use name=SimDataFormats/Track>
+<use name=SimMuon/MCTruth>
+<use name=SimTracker/Records>
+<use name=SimTracker/TrackAssociation>
+
+<flags EDM_PLUGIN=1>
+<export>
+   <lib name=UserCodeCSCPriEff>
+   <use name=FWCore/Framework>
+   <use name=FWCore/PluginManager>
+   <use name=FWCore/ParameterSet>
+</export>
