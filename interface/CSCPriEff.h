@@ -46,8 +46,10 @@
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 #include "RecoVertex/VertexPrimitives/interface/TransientVertex.h"
 
+//CSC Digis
+#include "DataFormats/CSCDigi/interface/CSCCorrelatedLCTDigiCollection.h"
+
 /*
-//CSC rechit
 #include "DataFormats/CSCRecHit/interface/CSCRecHit2DCollection.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
 
@@ -75,16 +77,21 @@ class CSCPriEff : public edm::EDFilter {
       explicit CSCPriEff(const edm::ParameterSet&);
       ~CSCPriEff();
       enum ParticleType	{LightMeson=1,CharmedMeson=2,ccbarMeson=3,BottomMeson=4,bbarMeson=5,LightBaryon=6,CharmedBaryon=7,BottomBaryon=8,DiQuarks=9,Lepton=10,W=11,Z=12,Other=13};
-
+      enum TheMuonType {PromptMuFromWZ=10,PromptMuFromLightMeson=11,PromptMuFromHeavyMeson=12,PromptMuFromLightBaryon=13,PromptMuFromHeavyBaryon=14,NotPromptMufromWZ=15,PromptMuFromOthers=16,PunchThrough=20,PunchThroughAndDecayInFlight=21,DecayInFlightFromLightMeson=31,DecayInFlightFromHeavyMeson=32,DecayInFlightFromLightBaryon=33,DecayInFlightFromHeavyBaryon=34,NotPunchThroughHadron=40,Others=1,NothingMatched=0};
+      //Details:
+      //NotPromptMufromWZ=15,PromptMuFromOthers=16 are error cases
+      //PunchThrough: it is a hadron and doesn't decay in the detector region
+      //PunchThroughAndDecayInFlight: it is a hadron and decays outside of HCAL (including HO)
    private:
       virtual void beginJob();
       virtual bool filter(edm::Event&, const edm::EventSetup&);
+      virtual reco::Muon::ArbitrationType MuonArbitrationTypeFromString( const std::string &);
       virtual void HepMCParentTree(HepMC::GenParticle *);
       virtual void SimTrackDaughtersTree(SimTrack *);
       inline ParticleType ParticleCata(int);
       inline void ClearVecs();
       inline bool IstheSameDChain(vector<int> &,vector<int> &);
-      virtual Byte_t classification(vector<Int_t> &);
+      virtual TheMuonType classification(vector<Int_t> &);
       const TrackingRecHit* getHitPtr(trackingRecHit_iterator iter) const {return &**iter;}
       inline Int_t FindSimTrackRecordingPosition( Int_t ParToSimPos ) {
 	Int_t count=0;
@@ -120,30 +127,37 @@ class CSCPriEff : public edm::EDFilter {
      ULong64_t RUN,EVENT,LS,ORBIT,BX;
    } Info;
    //Tracker Muon
-   vector<Float_t> *pt,*eta,*phi,*Vertex_x,*Vertex_y,*Vertex_z,*isoR03sumPt,*isoR03emEt,*isoR03hadEt,*isoR03hoEt,*isoR03nJets,*isoR03nTracks,*isoR05sumPt,*isoR05emEt,*isoR05hadEt,*isoR05hoEt,*isoR05nJets,*isoR05nTracks,*isoemVetoEt,*isohadVetoEt,*isohoVetoEt,*normalizedChi2,*TrkRecoChi2,*CaloE_emMax,*CaloE_emS9,*CaloE_emS25,*CaloE_hadMax,*CaloE_hadS9,*Calo_emPos_R,*Calo_emPos_eta,*Calo_emPos_phi,*Calo_hadPos_R,*Calo_hadPos_eta,*Calo_hadPos_phi,*dEdx,*dEdxError,*TrkKink,*GlbKink;
+   vector<Float_t> *pt,*eta,*phi,*Vertex_x,*Vertex_y,*Vertex_z,*isoR03sumPt,*isoR03emEt,*isoR03hadEt,*isoR03hoEt,*isoR03nJets,*isoR03nTracks,*isoR05sumPt,*isoR05emEt,*isoR05hadEt,*isoR05hoEt,*isoR05nJets,*isoR05nTracks,*isoemVetoEt,*isohadVetoEt,*isohoVetoEt,*normalizedChi2,*TrkRelChi2,*CaloE_emMax,*CaloE_emS9,*CaloE_emS25,*CaloE_hadMax,*CaloE_hadS9,*Calo_emPos_R,*Calo_emPos_eta,*Calo_emPos_phi,*Calo_hadPos_R,*Calo_hadPos_eta,*Calo_hadPos_phi,*dEdx,*dEdxError,*TrkKink,*GlbKink;
    vector<Bool_t> *chargeMinus,*isGlobalMu,*isTrackerMu;
    vector<Int_t> *dEdx_numberOfSaturatedMeasurements,*dEdx_numberOfMeasurements;
    //Tracks
    edm::InputTag tracksTag;
    string dEdxTag;
-   vector<UInt_t> *nValidTrackerHits,*nValidPixelHits,*nLostTrackerHits,*nLostPixelHits,*nBadMuonHits;
+   vector<UInt_t> *InnerTrack_nValidTrackerHits,*InnerTrack_nValidPixelHits,*InnerTrack_nLostTrackerHits,*InnerTrack_nLostPixelHits,*InnerTrack_ndof,*GlobalTrack_ndof;
+   vector<Float_t> *InnerTrack_chi2;
    UInt_t minTrackHits;
-   //Muon Chamber Match
-   vector<Float_t> *TrackDist[4],*TrackDistErr[4],*DXTrackToSegment[4],*DYTrackToSegment[4],*DXErrTrackToSegment[4],*DYErrTrackToSegment[4],*DRTrackToSegment[4],*DRErrTrackToSegment[4];
-   vector<Bool_t> *IsSegmentBelongsToTrackByDR[4],*IsSegmentBelongsToTrackByCleaning[4];
+   //Muon Selectors
+   unsigned int num_Cuts;
+   reco::Muon::ArbitrationType MuonArbitrationType;
+   vector<muon::SelectionType> OfficialMuonSelectors;
+   vector<Bool_t> * SelectorPassed[30],*MySelector;
+   //CSC Digis
+   edm::InputTag CSCDigisTag;
+   //Muon Chamber and Segment Match  0-3=CSC station 1-4; save position: Mu*4+station-1
+   vector<Float_t> *TrackDistToChamberEdge,*TrackDistToChamberEdgeErr,*XTrack,*YTrack,*XErrTrack,*YErrTrack,*XSegment,*YSegment,*XErrSegment,*YErrSegment,*DRTrackToSegment,*DRErrTrackToSegment;
+   vector<Bool_t> *IsSegmentBestInStationByDR,*IsSegmentBelongsToTrackByDR,*IsSegmentBelongsToTrackByCleaning;
    vector<UInt_t> *StationMask,*RequiredStationMask;
+   vector<Byte_t> *Ring,*Chamber,*MuonIndex,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
+   vector<Char_t> *Station;
    double maxChamberDist,maxChamberDistPull;
    //PrimaryVertex
    string PrimaryVerticesTag;
    vector<Float_t> *vx,*vxError,*vy,*vyError,*vz,*vzError;
    //Tracking particles ( combination of simulated tracks )
+   edm::InputTag TPInputTag;
    vector<Float_t> *TrkParticles_pt,*TrkParticles_eta,*TrkParticles_phi;
-   vector<Double_t> *MatchQuality;
+   vector<Double_t> *SharedHitsRatio,*MCMatchChi2;
    vector<Int_t> *TrkParticles_pdgId,*TrkParticles_charge;
-   //Muon Selectors
-   unsigned int num_Cuts;
-   vector<string> Cuts;
-   vector<Bool_t> * SelectorPassed[30],*MySelector;
    //To Get the Decay Chains
       //saved variables
    Float_t HepMCFourVec[4];
@@ -171,8 +185,7 @@ class CSCPriEff : public edm::EDFilter {
    //Errors and Warnings reports
    struct ErrorMsg
    {
-     Byte_t ErrorCode;
-     ULong64_t Run,Event;
+     ULong64_t ErrorCode,Run,Event;
    }Error;
    //Others
    static bool FirstEntry;
