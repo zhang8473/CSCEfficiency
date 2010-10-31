@@ -114,6 +114,11 @@ class CSCPriEff : public edm::EDFilter {
 	  }
 	return IsParInHep_iter-IsParInHep->begin();
       }
+      inline Bool_t IsTheSameSegment(UInt_t Seg1,UInt_t Seg2) {
+	if ( (*XSegment)[Seg1]!=(*XSegment)[Seg2] || (*YSegment)[Seg1]!=(*YSegment)[Seg2] ) return false;
+	if ( (*Ring)[Seg1] != (*Ring)[Seg2] || (*Chamber)[Seg1] != (*Chamber)[Seg2] ) return false;
+	return true;
+      }
       virtual void endJob() ;
 
       
@@ -145,10 +150,10 @@ class CSCPriEff : public edm::EDFilter {
    edm::InputTag CSCDigisTag;
    //Muon Chamber and Segment Match  0-3=CSC station 1-4; save position: Mu*4+station-1
    vector<Float_t> *TrackDistToChamberEdge,*TrackDistToChamberEdgeErr,*XTrack,*YTrack,*XErrTrack,*YErrTrack,*XSegment,*YSegment,*XErrSegment,*YErrSegment,*DRTrackToSegment,*DRErrTrackToSegment;
-   vector<Bool_t> *IsSegmentBestInStationByDR,*IsSegmentBelongsToTrackByDR,*IsSegmentBelongsToTrackByCleaning;
+   vector<Bool_t> *IsSegmentOwnedExclusively,*IsSegmentBestInStationByDR,*IsSegmentBelongsToTrackByDR,*IsSegmentBelongsToTrackByCleaning;
    vector<UInt_t> *StationMask,*RequiredStationMask;
-   vector<Byte_t> *Ring,*Chamber,*MuonIndex,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
-   vector<Char_t> *Station;
+   vector<Byte_t> *Chamber,*MuonIndex,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
+   vector<Char_t> *Ring;
    double maxChamberDist,maxChamberDistPull;
    //PrimaryVertex
    string PrimaryVerticesTag;
