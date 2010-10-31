@@ -12,7 +12,7 @@
 //
 // Original Author:  Zhang Jinzhong
 //         Created:  Mon Jun  7 22:19:50 CEST 2010
-// $Id: CSCPriEff.cc,v 1.6 2010/10/09 00:23:36 zhangjin Exp $
+// $Id: CSCPriEff.cc,v 1.7 2010/10/26 01:20:10 zhangjin Exp $
 //
 //
 //#define LocalRun
@@ -191,57 +191,77 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
       StationMask->push_back(iter->stationMask(MuonArbitrationType));
       RequiredStationMask->push_back(muon::RequiredStationMask(*iter,maxChamberDist,maxChamberDistPull,MuonArbitrationType));
       //chambers being considered
-      vector<const MuonChamberMatch*> chambers;
-      for( vector<MuonChamberMatch>::const_iterator chamberMatch = iter->matches().begin();chamberMatch != iter->matches().end(); chamberMatch++ ) {//chamber loop begin
+      vector<const MuonChamberMatch *> Chambers;
+      for( vector<MuonChamberMatch>::const_iterator chamberMatch = iter->matches().begin();chamberMatch != iter->matches().end(); chamberMatch++ ) {
 	if (chamberMatch->detector()!=MuonSubdetId::CSC) continue;
 	if (chamberMatch->dist()==999999) continue;
-	chambers.push_back(&(*chamberMatch));
+	Chambers.push_back( &(*chamberMatch) );
       }
-      UInt_t NumChambers=chambers.size();
-      for( UInt_t chamberMatch1 = 0;chamberMatch1 < NumChambers-1; chamberMatch1++ )
-	for( UInt_t chamberMatch2 = chamberMatch1+1; chamberMatch2 < NumChambers; chamberMatch2++ )
-	  if ( chambers[chamberMatch1]->station()>chambers[chamberMatch2]->station() ) {
-	    const MuonChamberMatch* temp=chambers[chamberMatch1];
-	    chambers[chamberMatch1]=chambers[chamberMatch2];
-	    chambers[chamberMatch2]=temp;
+      //align save position from inner to outter,from smaller chamber # to big
+      if (Chambers.size()>1)
+	for( vector<const MuonChamberMatch *>::iterator chamberMatch1 = Chambers.begin();chamberMatch1 != Chambers.end()-1; chamberMatch1++ ) {
+	  const CSCDetId ChamberID1( (*chamberMatch1)->id.rawId() );
+	  for( vector<const MuonChamberMatch *>::iterator chamberMatch2 = chamberMatch1+1;chamberMatch2 != Chambers.end(); chamberMatch2++ ) {
+	    const CSCDetId ChamberID2( (*chamberMatch2)->id.rawId() );
+	    if ( ChamberID1.endcap()<ChamberID2.endcap() ) continue;
+	    if ( ChamberID1.station()<ChamberID2.station() ) continue;
+	    if ( ChamberID1.station()==ChamberID2.station() ) {
+	      if ( ChamberID1.ring()%4<ChamberID2.ring()%4 ) continue;
+	      if ( ChamberID1.ring()==ChamberID2.ring() && ChamberID1.chamber()<ChamberID2.chamber() ) continue;
+	    }
+	    swap(*chamberMatch1,*chamberMatch2);
 	  }
-      for( vector<const MuonChamberMatch*>::const_iterator chamberMatch = chambers.begin();chamberMatch != chambers.end(); chamberMatch++ ) {
+	}
+      vector<Byte_t> NotSavedME14Chambers,SavedME14Chambers;
+      for( vector<const MuonChamberMatch *>::iterator chamberMatch = Chambers.begin();chamberMatch != Chambers.end(); chamberMatch++ ) {
 	const CSCDetId ChamberID( (*chamberMatch)->id.rawId() );
-	if ( ChamberID.endcap()==1 ) Station->push_back( -ChamberID.station() );
-	else Station->push_back( ChamberID.station() );
-	Ring->push_back( ChamberID.ring() );
-	Chamber->push_back( ChamberID.chamber() );
-	MuonIndex->push_back( eta->size()-1 );
-	NumberOfLCTsInChamber->push_back( 0 );
+	Byte_t NumberOfLCTs=0;
 	for (CSCCorrelatedLCTDigiCollection::DigiRangeIterator CSCDigi_iter = CSCLCTs->begin(); CSCDigi_iter != CSCLCTs->end(); CSCDigi_iter++) {
 	  const CSCDetId& LCTDetID = (*CSCDigi_iter).first;
-	  if ( ChamberID.endcap() != LCTDetID.endcap() || ChamberID.station() != LCTDetID.station() || Chamber->back() != LCTDetID.chamber() ) continue;
-	  if ( Ring->back() != LCTDetID.ring() ) {
-	    if ( ChamberID.station() != 1 ) continue;
-	    if ( Ring->back() != 1 && Ring->back() != 4 ) continue;
-	    if ( LCTDetID.ring() != 1 && LCTDetID.ring() != 4 ) continue;
-	  }
-	  NumberOfLCTsInChamber->back()++;
+	  if ( ChamberID.endcap() != LCTDetID.endcap() || ChamberID.station() != LCTDetID.station() || ChamberID.chamber() != LCTDetID.chamber() || ChamberID.ring() != LCTDetID.ring() ) continue;
+	  NumberOfLCTs++;
 	}
+	std::vector<MuonSegmentMatch>::const_iterator segmentMatch = (*chamberMatch)->segmentMatches.begin();
+	for( ;segmentMatch != (*chamberMatch)->segmentMatches.end(); segmentMatch++ ) 
+	  if (segmentMatch->isMask(MuonSegmentMatch::BestInChamberByDR)) break;
+	//do not save ME11,ME1/4 chambers twice if one of them is empty
+	if ( ChamberID.station()==1 && ChamberID.ring()==1 ) {
+	  vector<Byte_t>::iterator ME14Chamber=find( NotSavedME14Chambers.begin(),NotSavedME14Chambers.end(),ChamberID.chamber() );
+	  if ( ME14Chamber!=NotSavedME14Chambers.end() ) NotSavedME14Chambers.erase(ME14Chamber);
+	  else if ( segmentMatch == (*chamberMatch)->segmentMatches.end() && !NumberOfLCTs ) {
+	    if (find( SavedME14Chambers.begin(),SavedME14Chambers.end(),ChamberID.chamber() )!=SavedME14Chambers.end()) continue;
+	    else {ReportError(4,"TrackMuonProducerError: ME11 is saved but no ME14")}
+	  }
+	}
+	if ( ChamberID.station()==1 && ChamberID.ring()==4 ) {
+	  if ( segmentMatch == (*chamberMatch)->segmentMatches.end() && !NumberOfLCTs ) {NotSavedME14Chambers.push_back( ChamberID.chamber() );continue;}
+	  else SavedME14Chambers.push_back( ChamberID.chamber() );
+	}
+	//Chamber Information
+	Ring->push_back( ChamberID.station()*10+ChamberID.ring() );
+	if ( ChamberID.endcap()==1 ) Ring->back()=-Ring->back();
+	Chamber->push_back( ChamberID.chamber() );
+	MuonIndex->push_back( eta->size()-1 );
 	TrackDistToChamberEdge->push_back( (*chamberMatch)->dist() );
 	TrackDistToChamberEdgeErr->push_back( (*chamberMatch)->distErr() );
 	XTrack->push_back( (*chamberMatch)->x );
 	YTrack->push_back( (*chamberMatch)->y );
 	XErrTrack->push_back( (*chamberMatch)->xErr );
 	YErrTrack->push_back( (*chamberMatch)->yErr );
-	NumberOfHitsInSegment->push_back( 0 );
+	//LCT and segment information
+	NumberOfLCTsInChamber->push_back( NumberOfLCTs );
 	XSegment->push_back(999999);
 	YSegment->push_back(999999);
 	XErrSegment->push_back(999999);
 	YErrSegment->push_back(999999);
 	DRTrackToSegment->push_back(999999);
 	DRErrTrackToSegment->push_back(999999);
+	NumberOfHitsInSegment->push_back(0);
+	IsSegmentOwnedExclusively->push_back( false );
 	IsSegmentBestInStationByDR->push_back( false );
 	IsSegmentBelongsToTrackByDR->push_back( false );
 	IsSegmentBelongsToTrackByCleaning->push_back( false );
-	if ((*chamberMatch)->segmentMatches.empty()) continue;
-	for( std::vector<MuonSegmentMatch>::const_iterator segmentMatch = (*chamberMatch)->segmentMatches.begin();segmentMatch != (*chamberMatch)->segmentMatches.end(); segmentMatch++ ) {//segment loop begin
-	  if (!segmentMatch->isMask(MuonSegmentMatch::BestInChamberByDR)) continue;
+	if ( segmentMatch != (*chamberMatch)->segmentMatches.end() ) {
 	  if (segmentMatch->cscSegmentRef.isNonnull()) NumberOfHitsInSegment->back() = segmentMatch->cscSegmentRef->specificRecHits().size();
 	  else {ReportError(3,"CSC Station"<<(*chamberMatch)->station()<<", Segment Ref not found")}
 	  XSegment->back() = segmentMatch->x;
@@ -251,13 +271,19 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
 	  Float_t DXTrackToSegment=abs( XSegment->back()-XTrack->back() ),DYTrackToSegment=abs( YSegment->back()-YTrack->back() ),DXErrTrackToSegment=sqrt( XErrSegment->back()*XErrSegment->back()+XErrTrack->back()*XErrTrack->back() ),DYErrTrackToSegment=sqrt( YErrSegment->back()*YErrSegment->back()+YErrTrack->back()*YErrTrack->back() );
 	  DRTrackToSegment->back() = sqrt(DXTrackToSegment*DXTrackToSegment+DYTrackToSegment*DYTrackToSegment);
 	  DRErrTrackToSegment->back() = sqrt(DXTrackToSegment*DXTrackToSegment*DXErrTrackToSegment*DXErrTrackToSegment+DYTrackToSegment*DYTrackToSegment*DYErrTrackToSegment*DYErrTrackToSegment)/DRTrackToSegment->back();
+	  UInt_t CurrentChamber=XTrack->size()-1;
+	  IsSegmentOwnedExclusively->back()=true;
+	  for (UInt_t chamber=0; chamber<CurrentChamber&&MuonIndex->at(chamber)!=MuonIndex->back(); chamber++)
+	    if ( IsTheSameSegment(chamber,CurrentChamber) ) {
+	      IsSegmentOwnedExclusively->back()=false;
+	      IsSegmentOwnedExclusively->at(chamber)=false;
+	    }
 	  IsSegmentBestInStationByDR->back() = segmentMatch->isMask(MuonSegmentMatch::BestInStationByDR);
 	  IsSegmentBelongsToTrackByDR->back() = segmentMatch->isMask(MuonSegmentMatch::BelongsToTrackByDR);
 	  IsSegmentBelongsToTrackByCleaning->back() = segmentMatch->isMask(MuonSegmentMatch::BelongsToTrackByCleaning);
-	  break;
-	}//segment loop end
+	}
       }//chamber loop end
-
+      if ( !NotSavedME14Chambers.empty() ) {ReportError(4,"TrackMuonProducerError: found ME14 but no ME11, neither is saved chamber: "<<(UInt_t) NotSavedME14Chambers.front())}
       //miscellany
       Vertex_x->push_back(iter->vertex().X());
       Vertex_y->push_back(iter->vertex().Y());
@@ -420,18 +446,13 @@ CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
       for (; chamber<Total_Chambers&&(*MuonIndex)[chamber]==thisMuonIndex; chamber++)
 	if ( (*XSegment)[chamber]!=999999 && !OwnAChamberwtSeg ) {
 	  OwnAChamberwtSeg=true;
+	  if ( (*IsSegmentOwnedExclusively)[chamber] ) continue;
 	  for (UInt_t anotherchamber=0; anotherchamber<Total_Chambers; anotherchamber++) {
 	    Byte_t AnotherMuonIndex=(*MuonIndex)[anotherchamber];
 	    //the cases which we do not consider
 	    if ( thisMuonIndex==AnotherMuonIndex ) continue;
-	    if ( (*XSegment)[chamber]!=(*XSegment)[anotherchamber] || (*YSegment)[chamber]!=(*YSegment)[anotherchamber] ) continue;
-	    if ( (*Station)[chamber] != (*Station)[anotherchamber] || (*Chamber)[chamber] != (*Chamber)[anotherchamber] ) continue;
-	    if ( (*Ring)[chamber] != (*Ring)[anotherchamber] ) {
-	      if ( abs((*Station)[chamber]) != 1 ) continue;
-	      if ( (*Ring)[chamber] != 1 && (*Ring)[chamber] != 4 ) continue;
-	      if ( (*Ring)[anotherchamber] != 1 && (*Ring)[anotherchamber] != 4 ) continue;
-	    }
-	    Long64_t AnotherMuonType=(*MuonType)[(*MuonIndex)[anotherchamber]];
+	    if ( !IsTheSameSegment(chamber,anotherchamber) ) continue;
+	    Long64_t AnotherMuonType=(*MuonType)[AnotherMuonIndex];
 	    if ( AnotherMuonType==0 ) continue;
 	    //the cases which we consider
 	    if ( AnotherMuonType!=20 || (*DRTrackToSegment)[anotherchamber]<(*DRTrackToSegment)[chamber] ) {OwnAChamberwtSeg=false;break;}//the segment belongs to a muon or the segment better matches to another pounchthrough candidate
@@ -631,14 +652,13 @@ void CSCPriEff::ClearVecs() {
   
   TrackDistToChamberEdge->clear();  TrackDistToChamberEdgeErr->clear();
   XTrack->clear();YTrack->clear();  XErrTrack->clear();YErrTrack->clear();
-  Station->clear();Ring->clear();Chamber->clear();MuonIndex->clear();
+  Ring->clear();Chamber->clear();MuonIndex->clear();
   NumberOfLCTsInChamber->clear();
   XSegment->clear();  YSegment->clear();
   XErrSegment->clear();  YErrSegment->clear();
   DRTrackToSegment->clear();  DRErrTrackToSegment->clear();
-  IsSegmentBestInStationByDR->clear();
-  IsSegmentBelongsToTrackByDR->clear();
-  IsSegmentBelongsToTrackByCleaning->clear();
+  IsSegmentOwnedExclusively->clear();  IsSegmentBestInStationByDR->clear();
+  IsSegmentBelongsToTrackByDR->clear();  IsSegmentBelongsToTrackByCleaning->clear();
   NumberOfHitsInSegment->clear();
   StationMask->clear();RequiredStationMask->clear();
 
@@ -725,8 +745,7 @@ CSCPriEff::CSCPriEff(const edm::ParameterSet& pset) {
   MakeVecBranch("YTrack",YTrack,Float_t);
   MakeVecBranch("XErrTrack",XErrTrack,Float_t);
   MakeVecBranch("YErrTrack",YErrTrack,Float_t);
-  MakeVecBranch("Station",Station,Char_t);
-  MakeVecBranch("Ring",Ring,Byte_t);
+  MakeVecBranch("Ring",Ring,Char_t);
   MakeVecBranch("Chamber",Chamber,Byte_t);
   MakeVecBranch("MuonIndex",MuonIndex,Byte_t);
   MakeVecBranch("NumberOfLCTsInChamber",NumberOfLCTsInChamber,Byte_t);
@@ -737,6 +756,7 @@ CSCPriEff::CSCPriEff(const edm::ParameterSet& pset) {
   MakeVecBranch("YErrSegment",YErrSegment,Float_t);
   MakeVecBranch("DRTrackToSegment",DRTrackToSegment,Float_t);
   MakeVecBranch("DRErrTrackToSegment",DRErrTrackToSegment,Float_t);
+  MakeVecBranch("IsSegmentOwnedExclusively",IsSegmentOwnedExclusively,Bool_t);
   MakeVecBranch("IsSegmentBestInStationByDR",IsSegmentBestInStationByDR,Bool_t);
   MakeVecBranch("IsSegmentBelongsToTrackByDR",IsSegmentBelongsToTrackByDR,Bool_t);
   MakeVecBranch("IsSegmentBelongsToTrackByCleaning",IsSegmentBelongsToTrackByCleaning,Bool_t);
