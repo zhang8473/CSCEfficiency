@@ -26,7 +26,8 @@
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHitFwd.h"
 
 //Tracking Particles, Match to simulated tracks
-#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticleFwd.h"
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingVertexContainer.h"
 #include "DataFormats/RecoCandidate/interface/TrackAssociation.h"
 #include "SimTracker/Records/interface/TrackAssociatorRecord.h"
 #include "SimTracker/TrackAssociation/interface/TrackAssociatorBase.h"
@@ -49,11 +50,9 @@
 //CSC Digis
 #include "DataFormats/CSCDigi/interface/CSCCorrelatedLCTDigiCollection.h"
 
-/*
-#include "DataFormats/CSCRecHit/interface/CSCRecHit2DCollection.h"
+/*#include "DataFormats/CSCRecHit/interface/CSCRecHit2DCollection.h"
 #include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
 
-//Geometry
 #include "Geometry/CSCGeometry/interface/CSCGeometry.h"
 #include "Geometry/CSCGeometry/interface/CSCChamber.h"
 #include <Geometry/CSCGeometry/interface/CSCLayer.h>
@@ -62,9 +61,12 @@
 
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
+*/
+
+//Geometry
+#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
 #include "DataFormats/GeometryVector/interface/LocalPoint.h"
 #include "DataFormats/GeometryVector/interface/LocalVector.h"
-*/
 
 //ROOT
 #include "TTree.h"
@@ -77,42 +79,44 @@ class CSCPriEff : public edm::EDFilter {
       explicit CSCPriEff(const edm::ParameterSet&);
       ~CSCPriEff();
       enum ParticleType	{LightMeson=1,CharmedMeson=2,ccbarMeson=3,BottomMeson=4,bbarMeson=5,LightBaryon=6,CharmedBaryon=7,BottomBaryon=8,DiQuarks=9,Lepton=10,W=11,Z=12,Other=13};
-      enum TheMuonType {PromptMuFromWZ=10,PromptMuFromLightMeson=11,PromptMuFromHeavyMeson=12,PromptMuFromLightBaryon=13,PromptMuFromHeavyBaryon=14,NotPromptMufromWZ=15,PromptMuFromOthers=16,PunchThrough=20,PunchThroughAndDecayInFlight=21,DecayInFlightFromLightMeson=31,DecayInFlightFromHeavyMeson=32,DecayInFlightFromLightBaryon=33,DecayInFlightFromHeavyBaryon=34,NotPunchThroughHadron=40,Others=1,NothingMatched=0};
+      enum TheMuonType {PromptMuFromWZ=10,PromptMuFromLightMeson=11,PromptMuFromHeavyMeson=12,PromptMuFromLightBaryon=13,PromptMuFromHeavyBaryon=14,NotPromptMufromWZ=15,PromptMuFromOthers=16,PunchThrough=20,PunchThroughAndDecayInFlight=21,DecayInFlightFromLightMeson=31,DecayInFlightFromHeavyMeson=32,DecayInFlightFromLightBaryon=33,DecayInFlightFromHeavyBaryon=34,NoMuSysHit=40,Others=1,NothingMatched=0};
       //Details:
       //NotPromptMufromWZ=15,PromptMuFromOthers=16 are error cases
       //PunchThrough: it is a hadron and doesn't decay in the detector region
       //PunchThroughAndDecayInFlight: it is a hadron and decays outside of HCAL (including HO)
+      //NoMuSysHit: Candidates can be hardon, electron.
    private:
       virtual void beginJob();
-      virtual bool filter(edm::Event&, const edm::EventSetup&);
+      virtual Bool_t filter(edm::Event&, const edm::EventSetup&);
       virtual reco::Muon::ArbitrationType MuonArbitrationTypeFromString( const std::string &);
       virtual void HepMCParentTree(HepMC::GenParticle *);
-      virtual void SimTrackDaughtersTree(SimTrack *);
+      virtual void SimTrackDaughtersTree(const SimTrack * thisTrk, TrackingParticleRef tpr);
+      inline Bool_t SimHitToSegment(const PSimHit& hit);
       inline ParticleType ParticleCata(int);
       inline void ClearVecs();
-      inline bool IstheSameDChain(vector<int> &,vector<int> &);
+      inline Bool_t IstheSameDChain(vector<int> &,vector<int> &);
       virtual TheMuonType classification(vector<Int_t> &);
       const TrackingRecHit* getHitPtr(trackingRecHit_iterator iter) const {return &**iter;}
-      inline Int_t FindSimTrackRecordingPosition( Int_t ParToSimPos ) {
+      inline Int_t FindSimTrackRecordingPosition( Int_t SavedSimTrkPos ) {
 	Int_t count=0;
-	vector<Bool_t>::const_iterator IsParInHep_iter = IsParInHep->begin();
-	for (; IsParInHep_iter != IsParInHep->end(); IsParInHep_iter++ ) {
-	  if (!*IsParInHep_iter) {
-	    if (count==ParToSimPos) break;
+	vector<Bool_t>::const_iterator IsParSavedAsHep_iter = IsParSavedAsHep.begin();
+	for (; IsParSavedAsHep_iter != IsParSavedAsHep.end(); IsParSavedAsHep_iter++ ) {
+	  if (!*IsParSavedAsHep_iter) {
+	    if (count==SavedSimTrkPos) break;
 	    else count++;
 	  }
 	}
-	return IsParInHep_iter-IsParInHep->begin();
+	return IsParSavedAsHep_iter-IsParSavedAsHep.begin();
       }
-      inline Int_t FindHepMCRecordingPosition( Int_t ParToHepPos ) {
+      inline Int_t FindHepMCRecordingPosition( Int_t SavedHepParPos ) {
 	Int_t count=0;
-	vector<Bool_t>::const_iterator IsParInHep_iter = IsParInHep->begin();
-	for (; IsParInHep_iter != IsParInHep->end(); IsParInHep_iter++ )
-	  if (*IsParInHep_iter) {
-	    if (count==ParToHepPos) break;
+	vector<Bool_t>::const_iterator IsParSavedAsHep_iter = IsParSavedAsHep.begin();
+	for (; IsParSavedAsHep_iter != IsParSavedAsHep.end(); IsParSavedAsHep_iter++ )
+	  if (*IsParSavedAsHep_iter) {
+	    if (count==SavedHepParPos) break;
 	    else count++;
 	  }
-	return IsParInHep_iter-IsParInHep->begin();
+	return IsParSavedAsHep_iter-IsParSavedAsHep.begin();
       }
       inline Bool_t IsTheSameSegment(UInt_t Seg1,UInt_t Seg2) {
 	if ( (*XSegment)[Seg1]!=(*XSegment)[Seg2] || (*YSegment)[Seg1]!=(*YSegment)[Seg2] ) return false;
@@ -149,11 +153,16 @@ class CSCPriEff : public edm::EDFilter {
    //CSC Digis
    edm::InputTag CSCDigisTag;
    //Muon Chamber and Segment Match  0-3=CSC station 1-4; save position: Mu*4+station-1
-   vector<Float_t> *TrackDistToChamberEdge,*TrackDistToChamberEdgeErr,*XTrack,*YTrack,*XErrTrack,*YErrTrack,*XSegment,*YSegment,*XErrSegment,*YErrSegment,*DRTrackToSegment,*DRErrTrackToSegment;
+   vector<Float_t> *TrackDistToChamberEdge,*TrackDistToChamberEdgeErr,*XTrack,*YTrack,*XErrTrack,*YErrTrack,*XSegment,*YSegment,*XErrSegment,*YErrSegment,*DRTrackToSegment,*DRErrTrackToSegment,*XSimSegment,*YSimSegment;
    vector<Bool_t> *IsSegmentOwnedExclusively,*IsSegmentBestInStationByDR,*IsSegmentBelongsToTrackByDR,*IsSegmentBelongsToTrackByCleaning;
    vector<UInt_t> *StationMask,*RequiredStationMask;
-   vector<Byte_t> *Chamber,*MuonIndex,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
-   vector<Char_t> *Ring;
+   vector<Byte_t> *Chamber,*ChamberSimSegment,*MuonIndex,*MuonIndexSimSegment,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
+   vector<Char_t> *Ring,*RingSimSegment;
+   struct CSCSimHitInfo {
+     Float_t X,Y;
+     Byte_t Layer;
+   };
+   map<Int_t,CSCSimHitInfo> FirstLayer,LastLayer;//the first and last layer SimHits in one chamber. Int_t is the ChamberID
    double maxChamberDist,maxChamberDistPull;
    //PrimaryVertex
    string PrimaryVerticesTag;
@@ -169,17 +178,18 @@ class CSCPriEff : public edm::EDFilter {
    vector<Float_t> *Gen_pt,*Gen_eta,*Gen_phi,*Gen_vx,*Gen_vy,*Gen_vz,*Gen_vt;
    vector<Int_t> *Gen_pdgId;
    vector<Long64_t> *MuonType;//all possible chains; -1 is at the beginning of each chain; -2is at the beginning of each reco-muons;
-   vector<Bool_t> *IsParInHep;
+   vector<Bool_t> *IsParInHep,*IsParHasMuonHits;
    vector<Int_t> *DChains,*theSameWithMuon;
-      //temparory variables
+   //PSimHits
+   //temparory variables
    string HepMCTag;
    bool ChainRecord;
    vector< vector<Int_t> > SimChains;
    vector< vector<Int_t> > HepMCChains;
    vector<Int_t> DChain;
-   vector<SimTrack *> ParToSim,MaskOut;
-   vector<HepMC::GenParticle *> ParToHep;
-   map< SimTrack *, vector<SimTrack *> > Daughters;
+   vector<const SimTrack *> SavedSimTrk;
+   vector<HepMC::GenParticle *> SavedHepPar;
+   vector<Bool_t> IsParSavedAsHep;
    vector<SimVertex> SVC;
 
    //Summarization
