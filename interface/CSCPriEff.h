@@ -50,27 +50,24 @@
 //CSC Digis
 #include "DataFormats/CSCDigi/interface/CSCCorrelatedLCTDigiCollection.h"
 
-/*#include "DataFormats/CSCRecHit/interface/CSCRecHit2DCollection.h"
-#include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
-
-#include "Geometry/CSCGeometry/interface/CSCGeometry.h"
-#include "Geometry/CSCGeometry/interface/CSCChamber.h"
-#include <Geometry/CSCGeometry/interface/CSCLayer.h>
-#include <Geometry/CSCGeometry/interface/CSCLayerGeometry.h>
-#include <Geometry/Records/interface/MuonGeometryRecord.h>
-
-#include "DataFormats/GeometryVector/interface/GlobalPoint.h"
-#include "DataFormats/GeometryVector/interface/GlobalVector.h"
-*/
-
 //Geometry
-#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+#include "Geometry/CSCGeometry/interface/CSCGeometry.h" //CSC
 #include "DataFormats/GeometryVector/interface/LocalPoint.h"
 #include "DataFormats/GeometryVector/interface/LocalVector.h"
 
 //ROOT
 #include "TTree.h"
 #include "TFile.h"
+
+/*#include "DataFormats/CSCRecHit/interface/CSCRecHit2DCollection.h"
+#include "DataFormats/CSCRecHit/interface/CSCSegmentCollection.h"
+#include "Geometry/CSCGeometry/interface/CSCChamber.h"
+#include <Geometry/CSCGeometry/interface/CSCLayerGeometry.h>
+#include <Geometry/Records/interface/MuonGeometryRecord.h>
+#include "Geometry/Records/interface/GlobalTrackingGeometryRecord.h"
+#include "DataFormats/GeometryVector/interface/GlobalPoint.h"
+#include "DataFormats/GeometryVector/interface/GlobalVector.h"
+*/
 
 using namespace std;
 
@@ -91,6 +88,7 @@ class CSCPriEff : public edm::EDFilter {
       virtual reco::Muon::ArbitrationType MuonArbitrationTypeFromString( const std::string &);
       virtual void HepMCParentTree(HepMC::GenParticle *);
       virtual void SimTrackDaughtersTree(const SimTrack * thisTrk, TrackingParticleRef tpr);
+      inline void GetDecayChains(TrackingParticleRef tpr,vector<int> *DChains, vector <TheMuonType> &type, HepMC::GenEvent &HepGenEvent);
       inline Bool_t SimHitToSegment(const PSimHit& hit);
       inline ParticleType ParticleCata(int);
       inline void ClearVecs();
@@ -153,16 +151,18 @@ class CSCPriEff : public edm::EDFilter {
    //CSC Digis
    edm::InputTag CSCDigisTag;
    //Muon Chamber and Segment Match  0-3=CSC station 1-4; save position: Mu*4+station-1
-   vector<Float_t> *TrackDistToChamberEdge,*TrackDistToChamberEdgeErr,*XTrack,*YTrack,*XErrTrack,*YErrTrack,*XSegment,*YSegment,*XErrSegment,*YErrSegment,*DRTrackToSegment,*DRErrTrackToSegment,*XSimSegment,*YSimSegment;
+   vector<Float_t> *TrackDistToChamberEdge,*TrackDistToChamberEdgeErr,*XTrack,*YTrack,*XErrTrack,*YErrTrack,*XSegment,*YSegment,*XLCT,*YLCT,*XErrSegment,*YErrSegment,*XSimSegment,*YSimSegment,*XErrSimSegment,*YErrSimSegment;
    vector<Bool_t> *IsSegmentOwnedExclusively,*IsSegmentBestInStationByDR,*IsSegmentBelongsToTrackByDR,*IsSegmentBelongsToTrackByCleaning;
    vector<UInt_t> *StationMask,*RequiredStationMask;
-   vector<Byte_t> *Chamber,*ChamberSimSegment,*MuonIndex,*MuonIndexSimSegment,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
+   vector<Byte_t> *Chamber,*ChamberSimSegment,*MuonIndex,*MuonIndexSimSegment,*NumHitsSimSegment,*NumberOfLCTsInChamber,*NumberOfHitsInSegment;
    vector<Char_t> *Ring,*RingSimSegment;
-   struct CSCSimHitInfo {
-     Float_t X,Y;
-     Byte_t Layer;
+   struct CSCChamberSimHitsInfo {
+     Int_t ChamberID;
+     Float_t FirstHit_X,FirstHit_Y,LastHit_X,LastHit_Y;
+     Byte_t HitsMask;//1-6 bit stands for 6 layers
+     CSCChamberSimHitsInfo(Int_t ChamberID,Float_t a,Float_t b,Float_t c,Float_t d,Byte_t e):ChamberID(ChamberID),FirstHit_X(a),FirstHit_Y(b),LastHit_X(c),LastHit_Y(d),HitsMask(e) {}//creator
    };
-   map<Int_t,CSCSimHitInfo> FirstLayer,LastLayer;//the first and last layer SimHits in one chamber. Int_t is the ChamberID
+   vector<CSCChamberSimHitsInfo> ChamberSimHits;//the first and last layer SimHits in one chamber. Int_t is the ChamberID
    double maxChamberDist,maxChamberDistPull;
    //PrimaryVertex
    string PrimaryVerticesTag;
@@ -177,9 +177,9 @@ class CSCPriEff : public edm::EDFilter {
    Float_t HepMCFourVec[4];
    vector<Float_t> *Gen_pt,*Gen_eta,*Gen_phi,*Gen_vx,*Gen_vy,*Gen_vz,*Gen_vt;
    vector<Int_t> *Gen_pdgId;
-   vector<Long64_t> *MuonType;//all possible chains; -1 is at the beginning of each chain; -2is at the beginning of each reco-muons;
+   vector<Long64_t> *TTTruthMuType,*SegTruthMuType;//all possible chains; -1 is at the beginning of each chain; -2is at the beginning of each reco-muons;
    vector<Bool_t> *IsParInHep,*IsParHasMuonHits;
-   vector<Int_t> *DChains,*theSameWithMuon;
+   vector<Int_t> *TTTruthDChains,*SegTruthDChains,*theSameWithMuon;
    //PSimHits
    //temparory variables
    string HepMCTag;
@@ -190,6 +190,7 @@ class CSCPriEff : public edm::EDFilter {
    vector<const SimTrack *> SavedSimTrk;
    vector<HepMC::GenParticle *> SavedHepPar;
    vector<Bool_t> IsParSavedAsHep;
+   vector<TrackingParticleRef> SavedTP;
    vector<SimVertex> SVC;
 
    //Summarization

@@ -12,7 +12,7 @@
 //
 // Original Author:  Zhang Jinzhong
 //         Created:  Mon Jun  7 22:19:50 CEST 2010
-// $Id: CSCPriEff.cc,v 1.7 2010/10/26 01:20:10 zhangjin Exp $
+// $Id: CSCPriEff.cc,v 1.9 2010/11/03 03:51:47 zhangjin Exp $
 //
 //
 //#define LocalRun
@@ -26,21 +26,11 @@ using namespace reco;
   Error.Run=Info.RUN;			      \
   Error.Event=Info.EVENT;		      \
   ErrorMsg_Tree->Fill();		      \
-  cerr<<MSG<<endl;			      
+  cerr<<MSG<<endl			      
 
 #define GenSimMomentum(ppt,peta,pphi,ppdg) Gen_pdgId->push_back(ppdg);Gen_pt->push_back(ppt);Gen_eta->push_back(peta);Gen_phi->push_back(pphi)
 
 #define GenSimVertex(vtx,vty,vtz,vtt) Gen_vx->push_back(vtx);Gen_vy->push_back(vty);Gen_vz->push_back(vtz);Gen_vt->push_back(vtt)
-
-#define RecordSimTrack(thisTrk) SavedSimTrk.push_back(thisTrk);			\
-  IsParInHep->push_back(false);						\
-  IsParSavedAsHep.push_back(false);						\
-  GenSimMomentum(thisTrk->momentum().pt(),thisTrk->momentum().eta(),thisTrk->momentum().phi(),thisTrk->type());	\
-  if (!thisTrk->noVertex()) {						\
-    SimVertex thisVtx=SVC[thisTrk->vertIndex()];			\
-    GenSimVertex(thisVtx.position().x(),thisVtx.position().y(),thisVtx.position().z(),thisVtx.position().t()*1e9); \
-  }									\
-  else {GenSimVertex(0,0,0,0);}
 
 #define RecordHepMC(GenParticle) SavedHepPar.push_back(GenParticle);	\
   IsParInHep->push_back(true);						\
@@ -50,47 +40,20 @@ using namespace reco;
   if (thisVtx) {GenSimVertex(thisVtx->position().x()/10.,thisVtx->position().y()/10.,thisVtx->position().z()/10.,thisVtx->position().t()/299.792458);} \
   else {GenSimVertex(0,0,0,0);}
 
-#define SaveAndClassifyDChain(thisChain) int Muref=-1;			\
-  for (vector<int>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end()&&Muref<(int) eta->size()-1; DChain_iter++ ) { \
-    if (*DChain_iter==-1) {						\
-      DChain_iter++;							\
-      vector<int>::iterator DChain_begin=DChain_iter;			\
-      for (; DChain_iter != DChains->end()&&*DChain_iter!=-2&&*DChain_iter!=-1; DChain_iter++ ) ; \
-      if (DChain_begin!=DChain_iter)					\
-	if (IstheSameDChain(thisChain,* new vector<int> (DChain_begin,DChain_iter))) { \
-	  theSameWithMuon->back()=Muref;				\
-	  break;							\
-	}								\
-      DChain_iter--;							\
-    }									\
-    if (*DChain_iter==-2) Muref++;					\
-  }									\
-  DChains->push_back(-1);						\
-  DChains->insert(DChains->end(),thisChain.begin(),thisChain.end());	\
-  TheMuonType newtype=classification(thisChain);			\
-  if ( type.empty() ) type.push_back(newtype);				\
-  else if ( type.size()==1 && type.back()==Others ) type.back()=newtype;	\
-  else if ( type.size()==1 && type.back()==NoMuSysHit && newtype!=Others ) type.back()=newtype; \
-  else if (find(type.begin(),type.end(),newtype)==type.end() && newtype!=Others && newtype!=NoMuSysHit ) type.push_back(newtype)
-
-#define NtupleMuonSelection (iter->isTrackerMuon()||iter->isGlobalMuon())&&(abs(iter->eta())>0.8)
-
 // ------------ method called on each new Event  ------------
 
 Bool_t CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
   Summarization.Total_Events++;
-  
-  //Determine if keeps the event
-  pt->clear();
   //Set Muons Handle
   Handle<reco::MuonCollection> Muon;
   event.getByLabel("muons", Muon);
   if (!Muon.isValid()) return false;
   reco::MuonCollection const & muons = *Muon;
-  
+  vector<reco::MuonCollection::const_iterator> MuonQueue;
   for ( reco::MuonCollection::const_iterator iter = muons.begin(); iter != muons.end() ; ++iter)
-    if (NtupleMuonSelection) pt->push_back(iter->pt());
-  if (pt->size()==0) return false;
+    if (iter->isTrackerMuon()||iter->isGlobalMuon()) 
+      if (abs(iter->eta())>0.8) MuonQueue.push_back(iter);
+  if ( MuonQueue.empty() ) return false;
 #ifndef FilterOnly
   //general event information
   Info.RUN   = event.id ().run ();
@@ -122,7 +85,7 @@ Bool_t CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
       break;
     }
   }
-  if (GenParticle_iter == HepGenEvent.particles_end()) {ReportError(7,"No HepMC(Core) Vertex Information")}
+  if (GenParticle_iter == HepGenEvent.particles_end()) {ReportError(7,"No HepMC(Core) Vertex Information");}
 
   //Reco Tracks
   Handle<reco::TrackCollection> trackCollectionH;
@@ -130,6 +93,11 @@ Bool_t CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
   reco::TrackCollection tC = *trackCollectionH.product();
   Handle< View<Track> > trackCollectionHV;
   event.getByLabel(tracksTag,trackCollectionHV);
+
+  //CSC Geometry
+  ESHandle<CSCGeometry> cscGeometry;
+  iSetup.get<MuonGeometryRecord>().get(cscGeometry);
+
   //CSC LCT Digis
   edm::Handle<CSCCorrelatedLCTDigiCollection> CSCLCTs;
   try{
@@ -151,8 +119,8 @@ Bool_t CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
 
   //Tracking Particles (collection of SimTracks and Hits)
   Handle<TrackingParticleCollection> TPCollectionH ;
-  //event.getByType(TPCollectionH);
   event.getByLabel(TPInputTag,TPCollectionH);
+  UInt_t TPCollectionSize = TPCollectionH.product()->size();
 
   //SimToReco Tracks Association
   ESHandle<TrackAssociatorBase> AssociatorByHits;
@@ -174,290 +142,307 @@ Bool_t CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
       vy->push_back(v->y());	   vyError->push_back(v->yError());
       vz->push_back(v->z());	   vzError->push_back(v->zError());
     }
-  else if (FirstEntry) {ReportError(1,PrimaryVerticesTag.c_str()<<" information is not valid.")}
-  for ( reco::MuonCollection::const_iterator iter = muons.begin(); iter != muons.end() ; ++iter)
-    //muon loop begin
-    if (NtupleMuonSelection) {
-      //muon basic information (pt,eta,phi,charge)
-      eta->push_back(iter->eta());
-      phi->push_back(iter->phi());
-      if (iter->charge()==-1) chargeMinus->push_back(true);
-      else chargeMinus->push_back(false);
-      //Muon Selectors
-      if (iter->isTrackerMuon()) Summarization.Total_TrackerMuons++;
-      isTrackerMu->push_back(iter->isTrackerMuon());
-      if (iter->isGlobalMuon()) Summarization.Total_GlobalMuon++;
-      isGlobalMu->push_back(iter->isGlobalMuon());
-      if (!iter->isTrackerMuon()&&iter->isGlobalMuon()) Summarization.Total_GlobalnotTrackerMuon++;
-      for (unsigned int whichcut=0;whichcut<num_Cuts;whichcut++)
-	SelectorPassed[whichcut]->push_back(muon::isGoodMuon(*iter,OfficialMuonSelectors[whichcut]));
-      MySelector->push_back(muon::isGoodMuon(*iter,muon::TMLastStation,1,3,3,3,3,maxChamberDist,maxChamberDistPull,MuonArbitrationType,false,true));
-      //Station and Segment Matches
-      StationMask->push_back(iter->stationMask(MuonArbitrationType));
-      RequiredStationMask->push_back(muon::RequiredStationMask(*iter,maxChamberDist,maxChamberDistPull,MuonArbitrationType));
-      //chambers being considered
-      vector<const MuonChamberMatch *> Chambers;
-      for( vector<MuonChamberMatch>::const_iterator chamberMatch = iter->matches().begin();chamberMatch != iter->matches().end(); chamberMatch++ ) {
-	if (chamberMatch->detector()!=MuonSubdetId::CSC) continue;
-	Chambers.push_back( &(*chamberMatch) );
+  else if (FirstEntry) {ReportError(1,PrimaryVerticesTag.c_str()<<" information is not valid.");}
+  for (vector<reco::MuonCollection::const_iterator>::iterator iter_queue=MuonQueue.begin();iter_queue!=MuonQueue.end(); ++iter_queue ) { //muon loop begin
+    reco::MuonCollection::const_iterator iter=*iter_queue;
+    //muon basic information (pt,eta,phi,charge)
+    TrackRef innertrack = iter->innerTrack();
+    if ( innertrack.isNull() ) continue;
+    pt->push_back(iter->pt());
+    eta->push_back(iter->eta());
+    phi->push_back(iter->phi());
+    if (iter->charge()==-1) chargeMinus->push_back(true);
+    else chargeMinus->push_back(false);
+    //Muon Selectors
+    if (iter->isTrackerMuon()) Summarization.Total_TrackerMuons++;
+    isTrackerMu->push_back(iter->isTrackerMuon());
+    if (iter->isGlobalMuon()) Summarization.Total_GlobalMuon++;
+    isGlobalMu->push_back(iter->isGlobalMuon());
+    if (!iter->isTrackerMuon()&&iter->isGlobalMuon()) Summarization.Total_GlobalnotTrackerMuon++;
+    for (unsigned int whichcut=0;whichcut<num_Cuts;whichcut++)
+      SelectorPassed[whichcut]->push_back(muon::isGoodMuon(*iter,OfficialMuonSelectors[whichcut]));
+    MySelector->push_back(muon::isGoodMuon(*iter,muon::TMLastStation,1,3,3,3,3,maxChamberDist,maxChamberDistPull,MuonArbitrationType,false,true));
+    //Station and Segment Matches
+    StationMask->push_back(iter->stationMask(MuonArbitrationType));
+    RequiredStationMask->push_back(muon::RequiredStationMask(*iter,maxChamberDist,maxChamberDistPull,MuonArbitrationType));
+    //match to RecoTrk
+    dEdx->push_back(dEdxTrack[innertrack].dEdx());
+    dEdxError->push_back(dEdxTrack[innertrack].dEdxError());
+    dEdx_numberOfSaturatedMeasurements->push_back(dEdxTrack[innertrack].numberOfSaturatedMeasurements());
+    dEdx_numberOfMeasurements->push_back(dEdxTrack[innertrack].numberOfMeasurements());
+    theSameWithMuon->push_back(-1);
+    InnerTrack_nValidTrackerHits->push_back(innertrack->hitPattern().numberOfValidTrackerHits());
+    InnerTrack_nValidPixelHits->push_back(innertrack->hitPattern().numberOfValidPixelHits());
+    InnerTrack_nLostPixelHits->push_back(innertrack->hitPattern().numberOfLostPixelHits());
+    InnerTrack_nLostTrackerHits->push_back(innertrack->hitPattern().numberOfLostTrackerHits());
+    InnerTrack_chi2->push_back(innertrack->chi2());
+    InnerTrack_ndof->push_back(innertrack->ndof());
+    //Match to Tracking Particle Collection
+    SavedTP.clear();
+    TrkParticles_pt->push_back(0);
+    TrkParticles_eta->push_back(0);
+    TrkParticles_phi->push_back(0);
+    TrkParticles_pdgId->push_back(0);
+    TrkParticles_charge->push_back(-100.0);
+    SharedHitsRatio->push_back(-100.0);
+    MCMatchChi2->push_back(-100.0);
+    TTTruthDChains->push_back(-2);
+    TTTruthMuType->push_back(0);
+    SegTruthDChains->push_back(-2);
+    SegTruthMuType->push_back(0);
+    NumMisMatch++;
+    ChamberSimHits.clear();
+    RefToBase<Track> trk(innertrack);
+    if (InnerTrack_nValidTrackerHits->back()>=minTrackHits&&RecoToSimByHits.find(trk) != RecoToSimByHits.end()&&RecoToSimByChi2.find(trk) != RecoToSimByChi2.end()) {
+      pair<TrackingParticleRef, double>  BestMatch=RecoToSimByHits[trk].front();
+      vector<pair<TrackingParticleRef, double> > TPCByChi2=RecoToSimByChi2[trk];
+      vector<pair<TrackingParticleRef, double> >::iterator TPCByChi2_iter=TPCByChi2.begin();
+      for (;TPCByChi2_iter!=TPCByChi2.end();TPCByChi2_iter++)
+	if (BestMatch.first==TPCByChi2_iter->first) break;
+      if (TPCByChi2_iter!=TPCByChi2.end()) {
+	TrackingParticleRef tpr = BestMatch.first;
+	//Simulated Tracks
+	TrkParticles_pt->back()=tpr->pt();
+	TrkParticles_eta->back()=tpr->eta();
+	TrkParticles_phi->back()=tpr->phi();
+	TrkParticles_charge->back()=tpr->charge();
+	TrkParticles_pdgId->back()=tpr->pdgId();
+	SharedHitsRatio->back()=BestMatch.second;
+	MCMatchChi2->back()=-1.*TPCByChi2_iter->second;
+	NumMisMatch--;
+	//Get the decay chain of this track
+	vector <TheMuonType> type;
+	GetDecayChains(tpr,TTTruthDChains,type,HepGenEvent);
+	Long64_t TypeRecord=0;
+	for (vector <TheMuonType>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
+	  if (*type_iter) TypeRecord=TypeRecord*100+Long64_t(*type_iter);
+	TTTruthMuType->back()=TypeRecord;
       }
-      //align save position from inner to outter,from smaller chamber # to big
-      if (Chambers.size()>1)
-	for( vector<const MuonChamberMatch *>::iterator chamberMatch1 = Chambers.begin();chamberMatch1 != Chambers.end()-1; chamberMatch1++ ) {
-	  const CSCDetId ChamberID1( (*chamberMatch1)->id.rawId() );
-	  for( vector<const MuonChamberMatch *>::iterator chamberMatch2 = chamberMatch1+1;chamberMatch2 != Chambers.end(); chamberMatch2++ ) {
-	    const CSCDetId ChamberID2( (*chamberMatch2)->id.rawId() );
-	    if ( ChamberID1.endcap()>ChamberID2.endcap() ) continue;
-	    if ( ChamberID1.station()<ChamberID2.station() ) continue;
-	    if ( ChamberID1.station()==ChamberID2.station() ) {
-	      if ( ChamberID1.ring()%4<ChamberID2.ring()%4 ) continue;
-	      if ( ChamberID1.ring()==ChamberID2.ring() && ChamberID1.chamber()<ChamberID2.chamber() ) continue;
+    }
+    //chambers being considered
+    vector<const MuonChamberMatch *> Chambers;
+    for( vector<MuonChamberMatch>::const_iterator chamberMatch = iter->matches().begin();chamberMatch != iter->matches().end(); chamberMatch++ ) {
+      if (chamberMatch->detector()!=MuonSubdetId::CSC) continue;
+      Chambers.push_back( &(*chamberMatch) );
+    }
+    //align save position from inner to outter,from smaller chamber # to big
+    if (Chambers.size()>1)
+      for( vector<const MuonChamberMatch *>::iterator chamberMatch1 = Chambers.begin();chamberMatch1 != Chambers.end()-1; chamberMatch1++ ) {
+	const CSCDetId ChamberID1( (*chamberMatch1)->id.rawId() );
+	for( vector<const MuonChamberMatch *>::iterator chamberMatch2 = chamberMatch1+1;chamberMatch2 != Chambers.end(); chamberMatch2++ ) {
+	  const CSCDetId ChamberID2( (*chamberMatch2)->id.rawId() );
+	  if ( ChamberID1.endcap()>ChamberID2.endcap() ) continue;
+	  if ( ChamberID1.station()<ChamberID2.station() ) continue;
+	  if ( ChamberID1.station()==ChamberID2.station() ) {
+	    if ( ChamberID1.ring()%4<ChamberID2.ring()%4 ) continue;
+	    if ( ChamberID1.ring()==ChamberID2.ring() && ChamberID1.chamber()<ChamberID2.chamber() ) continue;
+	  }
+	  swap(*chamberMatch1,*chamberMatch2);
+	}
+      }
+    for( vector<const MuonChamberMatch *>::iterator chamberMatch = Chambers.begin();chamberMatch != Chambers.end(); chamberMatch++ ) {//chamberloop begin
+      const CSCDetId ChamberID( (*chamberMatch)->id.rawId() );
+      Byte_t NumberOfLCTs=0; Float_t dR=999999.,XthisLCT=999999.,YthisLCT=999999.;
+      for (CSCCorrelatedLCTDigiCollection::DigiRangeIterator CSCDigi_iter = CSCLCTs->begin(); CSCDigi_iter != CSCLCTs->end(); CSCDigi_iter++) {
+	const CSCDetId& LCTDetID = (*CSCDigi_iter).first;
+	if ( ChamberID.endcap() != LCTDetID.endcap() || ChamberID.station() != LCTDetID.station() || ChamberID.chamber() != LCTDetID.chamber() || ChamberID.ring() != LCTDetID.ring() ) continue;
+	const CSCLayer *csclayer=cscGeometry->chamber(LCTDetID)->layer(3);
+	const CSCLayerGeometry *layerGeometry=csclayer->geometry();
+	const CSCCorrelatedLCTDigiCollection::Range& LCTRange = (*CSCDigi_iter).second;
+	for (CSCCorrelatedLCTDigiCollection::const_iterator LCT_iter = LCTRange.first; LCT_iter != LCTRange.second; LCT_iter++) {
+	  NumberOfLCTs++;
+	  Int_t WGCenter = layerGeometry->middleWireOfGroup( LCT_iter->getKeyWG() );
+	  Int_t halfstrip_id = LCT_iter->getStrip();
+	  
+#define GETLCTPOS LocalPoint LCTPos = layerGeometry->intersectionOfStripAndWire( halfstrip_id/2. , WGCenter ); \
+	  Float_t new_dR=sqrt(pow(LCTPos.x()-XTrack->back(),2)+pow(LCTPos.y()-YTrack->back(),2)); \
+	  if ( new_dR<dR ) {						\
+	    dR=new_dR;							\
+	    XthisLCT=LCTPos.x();YthisLCT=LCTPos.y();			\
+	  }
+	  
+	  if( ( abs(Chamber->back())==14 || abs(Chamber->back())==11 ) && XTrack->back()!=999999 ){
+	    halfstrip_id=halfstrip_id%32;
+	    for(Byte_t ME14ReadOut = 0; ME14ReadOut < 3; ME14ReadOut++){
+	      GETLCTPOS
+	      halfstrip_id = halfstrip_id + 32;
+	    } 
+	  }
+	  else {GETLCTPOS}
+	}
+      }
+      std::vector<MuonSegmentMatch>::const_iterator segmentMatch = (*chamberMatch)->segmentMatches.begin();
+      for( ;segmentMatch != (*chamberMatch)->segmentMatches.end(); segmentMatch++ ) 
+	if (segmentMatch->isMask(MuonSegmentMatch::BestInChamberByDR)) break;
+      //if ( segmentMatch == (*chamberMatch)->segmentMatches.end() && !NumberOfLCTs && (*chamberMatch)->dist()==999999 ) continue;//drop the chamber with nothing in
+      
+      //Chamber Information
+      Ring->push_back( ChamberID.station()*10+ChamberID.ring() );
+      if ( ChamberID.endcap()==2 ) Ring->back()=-Ring->back();
+      Chamber->push_back( ChamberID.chamber() );
+      MuonIndex->push_back( eta->size()-1 );
+      TrackDistToChamberEdge->push_back( (*chamberMatch)->dist() );
+      TrackDistToChamberEdgeErr->push_back( (*chamberMatch)->distErr() );
+      
+      XTrack->push_back( (*chamberMatch)->x );
+      YTrack->push_back( (*chamberMatch)->y );
+      XErrTrack->push_back( (*chamberMatch)->xErr );
+      YErrTrack->push_back( (*chamberMatch)->yErr );
+      //LCT and segment information
+      NumberOfLCTsInChamber->push_back( NumberOfLCTs );
+      XLCT->push_back(XthisLCT);
+      YLCT->push_back(YthisLCT);
+      XSegment->push_back(999999);
+      YSegment->push_back(999999);
+      XErrSegment->push_back(999999);
+      YErrSegment->push_back(999999);
+      NumberOfHitsInSegment->push_back(0);
+      IsSegmentOwnedExclusively->push_back( false );
+      IsSegmentBestInStationByDR->push_back( false );
+      IsSegmentBelongsToTrackByDR->push_back( false );
+      IsSegmentBelongsToTrackByCleaning->push_back( false );
+      if ( segmentMatch != (*chamberMatch)->segmentMatches.end() ) {
+	if (segmentMatch->cscSegmentRef.isNonnull()) NumberOfHitsInSegment->back() = segmentMatch->cscSegmentRef->specificRecHits().size();
+	else {ReportError(3,"CSC Station"<<(*chamberMatch)->station()<<", Segment Ref not found");}
+	XSegment->back() = segmentMatch->x;
+	YSegment->back() = segmentMatch->y;
+	XErrSegment->back() = segmentMatch->xErr;
+	YErrSegment->back() = segmentMatch->yErr;
+	UInt_t CurrentChamber=XTrack->size()-1;
+	IsSegmentOwnedExclusively->back()=true;
+	for (UInt_t chamber=0; chamber<CurrentChamber&&MuonIndex->at(chamber)!=MuonIndex->back(); chamber++)
+	  if ( IsTheSameSegment(chamber,CurrentChamber) ) {
+	    IsSegmentOwnedExclusively->back()=false;
+	    IsSegmentOwnedExclusively->at(chamber)=false;
+	  }
+	IsSegmentBestInStationByDR->back() = segmentMatch->isMask(MuonSegmentMatch::BestInStationByDR);
+	IsSegmentBelongsToTrackByDR->back() = segmentMatch->isMask(MuonSegmentMatch::BelongsToTrackByDR);
+	IsSegmentBelongsToTrackByCleaning->back() = segmentMatch->isMask(MuonSegmentMatch::BelongsToTrackByCleaning);
+      }
+    }//chamber loop end
+    //Segment Truth
+    vector <TheMuonType> type;SavedTP.clear();
+    UInt_t NumOfSegments=XSegment->size();
+    for (UInt_t Seg=0; Seg<NumOfSegments; Seg++)
+      if ( XSegment->at(Seg)<99999. && MuonIndex->at(Seg)==eta->size()-1 && IsSegmentOwnedExclusively->at(Seg) ) {
+	Float_t DR2=999999.; Int_t tpIndex=-2;
+	for( UInt_t tp_iter = 0; tp_iter < TPCollectionSize; tp_iter++ ) {
+	  TrackingParticleRef tpr(TPCollectionH,tp_iter);
+	  if ( find(SavedTP.begin(),SavedTP.end(),tpr)!=SavedTP.end() ) continue;
+	  for ( vector<PSimHit>::const_iterator g4Hit_iter=tpr->pSimHit_begin();g4Hit_iter!=tpr->pSimHit_end();g4Hit_iter++ ) {
+	    DetId SimHitDetectorId( g4Hit_iter->detUnitId() );
+	    if ( SimHitDetectorId.det() != DetId::Muon || SimHitDetectorId.subdetId() != MuonSubdetId::CSC ) continue;
+	    const CSCDetId SimHitChamberID( g4Hit_iter->detUnitId() );
+	    Int_t SimHitRing = SimHitChamberID.station()*10+SimHitChamberID.ring();
+	    if ( SimHitChamberID.endcap()==2 ) SimHitRing=-SimHitRing;
+	    if ( Ring->at(Seg) != SimHitRing || Chamber->at(Seg) != SimHitChamberID.chamber() ) continue;
+	    Local3DPoint entryPoint = g4Hit_iter->entryPoint(), exitPoint = g4Hit_iter->exitPoint();
+	    LocalVector direction = exitPoint - entryPoint;
+	    if ( fabs(direction.z()) <= 0.001) continue;
+	    LocalPoint projection = entryPoint - direction*(entryPoint.z()/direction.z());
+	    if ( fabs(projection.z()) > 0.001 ) continue;
+	    Float_t newDR2=pow(projection.x()-XSegment->at(Seg),2)+pow(projection.y()-YSegment->at(Seg),2);
+	    if (newDR2<DR2) {
+	      DR2=newDR2;
+	      tpIndex=Int_t(tp_iter);
 	    }
-	    swap(*chamberMatch1,*chamberMatch2);
 	  }
 	}
-      for( vector<const MuonChamberMatch *>::iterator chamberMatch = Chambers.begin();chamberMatch != Chambers.end(); chamberMatch++ ) {
-	const CSCDetId ChamberID( (*chamberMatch)->id.rawId() );
-	Byte_t NumberOfLCTs=0;
-	for (CSCCorrelatedLCTDigiCollection::DigiRangeIterator CSCDigi_iter = CSCLCTs->begin(); CSCDigi_iter != CSCLCTs->end(); CSCDigi_iter++) {
-	  const CSCDetId& LCTDetID = (*CSCDigi_iter).first;
-	  if ( ChamberID.endcap() != LCTDetID.endcap() || ChamberID.station() != LCTDetID.station() || ChamberID.chamber() != LCTDetID.chamber() || ChamberID.ring() != LCTDetID.ring() ) continue;
-	  NumberOfLCTs++;
+	if ( tpIndex>=0 ) GetDecayChains(TrackingParticleRef(TPCollectionH,tpIndex),SegTruthDChains,type,HepGenEvent);
+      }
+    ULong64_t TypeRecord=0;
+    for (vector <TheMuonType>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
+      if (*type_iter) TypeRecord=TypeRecord*100+Long64_t(*type_iter);
+    SegTruthMuType->back()=TypeRecord;
+    //miscellany
+    Vertex_x->push_back(iter->vertex().X());
+    Vertex_y->push_back(iter->vertex().Y());
+    Vertex_z->push_back(iter->vertex().Z());
+    isoR03sumPt->push_back(iter->isolationR03().sumPt);
+    isoR03emEt->push_back(iter->isolationR03().emEt);
+    isoR03hadEt->push_back(iter->isolationR03().hadEt);
+    isoR03hoEt->push_back(iter->isolationR03().hoEt);
+    isoR03nJets->push_back(iter->isolationR03().nJets);
+    isoR03nTracks->push_back(iter->isolationR03().nTracks);
+    isoR05sumPt->push_back(iter->isolationR05().sumPt);
+    isoR05emEt->push_back(iter->isolationR05().emEt);
+    isoR05hadEt->push_back(iter->isolationR05().hadEt);
+    isoR05hoEt->push_back(iter->isolationR05().hoEt);
+    isoR05nJets->push_back(iter->isolationR05().nJets);
+    isoR05nTracks->push_back(iter->isolationR05().nTracks);
+    isoemVetoEt->push_back(iter->isolationR03().emVetoEt);
+    isohadVetoEt->push_back(iter->isolationR03().hadVetoEt);
+    isohoVetoEt->push_back(iter->isolationR03().hoVetoEt);
+    TrkKink->push_back(iter->combinedQuality().trkKink);
+    GlbKink->push_back(iter->combinedQuality().glbKink);
+    TrkRelChi2->push_back(iter->combinedQuality().trkRelChi2);
+    CaloE_emMax->push_back(iter->calEnergy().emMax);
+    CaloE_emS9->push_back(iter->calEnergy().emS9);
+    CaloE_emS25->push_back(iter->calEnergy().emS25);
+    CaloE_hadMax->push_back(iter->calEnergy().hadMax);
+    CaloE_hadS9->push_back(iter->calEnergy().hadS9);
+    Calo_emPos_R->push_back(iter->calEnergy().ecal_position.R());
+    Calo_emPos_eta->push_back(iter->calEnergy().ecal_position.eta());
+    Calo_emPos_phi->push_back(iter->calEnergy().ecal_position.phi());
+    Calo_hadPos_R->push_back(iter->calEnergy().hcal_position.R());
+    Calo_hadPos_eta->push_back(iter->calEnergy().hcal_position.eta());
+    Calo_hadPos_phi->push_back(iter->calEnergy().hcal_position.phi());
+    if ( ChamberSimHits.size()>1 )
+      for ( vector<CSCChamberSimHitsInfo>::iterator SimSeg1=ChamberSimHits.begin();SimSeg1!=ChamberSimHits.end()-1;SimSeg1++) 
+	for ( vector<CSCChamberSimHitsInfo>::iterator SimSeg2=SimSeg1+1;SimSeg2!=ChamberSimHits.end();SimSeg2++) {
+	  Int_t ChamberID1=abs(SimSeg1->ChamberID),ChamberID2=abs(SimSeg2->ChamberID);
+	  if ( ChamberID1>=1400 && ChamberID1<1500 ) ChamberID1-=400;
+	  if ( ChamberID2>=1400 && ChamberID2<1500 ) ChamberID2-=400;
+	  if ( ChamberID1>ChamberID2 ) swap(*SimSeg1,*SimSeg2);
 	}
-	std::vector<MuonSegmentMatch>::const_iterator segmentMatch = (*chamberMatch)->segmentMatches.begin();
-	for( ;segmentMatch != (*chamberMatch)->segmentMatches.end(); segmentMatch++ ) 
-	  if (segmentMatch->isMask(MuonSegmentMatch::BestInChamberByDR)) break;
-	if ( segmentMatch == (*chamberMatch)->segmentMatches.end() && !NumberOfLCTs && (*chamberMatch)->dist()==999999 ) continue;//drop the chamber with nothing in
-
-	//Chamber Information
-	Ring->push_back( ChamberID.station()*10+ChamberID.ring() );
-	if ( ChamberID.endcap()==2 ) Ring->back()=-Ring->back();
-	Chamber->push_back( ChamberID.chamber() );
-	MuonIndex->push_back( eta->size()-1 );
-	TrackDistToChamberEdge->push_back( (*chamberMatch)->dist() );
-	TrackDistToChamberEdgeErr->push_back( (*chamberMatch)->distErr() );
-
-	XTrack->push_back( (*chamberMatch)->x );
-	YTrack->push_back( (*chamberMatch)->y );
-	XErrTrack->push_back( (*chamberMatch)->xErr );
-	YErrTrack->push_back( (*chamberMatch)->yErr );
-	//LCT and segment information
-	NumberOfLCTsInChamber->push_back( NumberOfLCTs );
-	XSegment->push_back(999999);
-	YSegment->push_back(999999);
-	XErrSegment->push_back(999999);
-	YErrSegment->push_back(999999);
-	DRTrackToSegment->push_back(999999);
-	DRErrTrackToSegment->push_back(999999);
-	NumberOfHitsInSegment->push_back(0);
-	IsSegmentOwnedExclusively->push_back( false );
-	IsSegmentBestInStationByDR->push_back( false );
-	IsSegmentBelongsToTrackByDR->push_back( false );
-	IsSegmentBelongsToTrackByCleaning->push_back( false );
-	if ( segmentMatch != (*chamberMatch)->segmentMatches.end() ) {
-	  if (segmentMatch->cscSegmentRef.isNonnull()) NumberOfHitsInSegment->back() = segmentMatch->cscSegmentRef->specificRecHits().size();
-	  else {ReportError(3,"CSC Station"<<(*chamberMatch)->station()<<", Segment Ref not found")}
-	  XSegment->back() = segmentMatch->x;
-	  YSegment->back() = segmentMatch->y;
-	  XErrSegment->back() = segmentMatch->xErr;
-	  YErrSegment->back() = segmentMatch->yErr;
-	  Float_t DXTrackToSegment=abs( XSegment->back()-XTrack->back() ),DYTrackToSegment=abs( YSegment->back()-YTrack->back() ),DXErrTrackToSegment=sqrt( XErrSegment->back()*XErrSegment->back()+XErrTrack->back()*XErrTrack->back() ),DYErrTrackToSegment=sqrt( YErrSegment->back()*YErrSegment->back()+YErrTrack->back()*YErrTrack->back() );
-	  DRTrackToSegment->back() = sqrt(DXTrackToSegment*DXTrackToSegment+DYTrackToSegment*DYTrackToSegment);
-	  DRErrTrackToSegment->back() = sqrt(DXTrackToSegment*DXTrackToSegment*DXErrTrackToSegment*DXErrTrackToSegment+DYTrackToSegment*DYTrackToSegment*DYErrTrackToSegment*DYErrTrackToSegment)/DRTrackToSegment->back();
-	  UInt_t CurrentChamber=XTrack->size()-1;
-	  IsSegmentOwnedExclusively->back()=true;
-	  for (UInt_t chamber=0; chamber<CurrentChamber&&MuonIndex->at(chamber)!=MuonIndex->back(); chamber++)
-	    if ( IsTheSameSegment(chamber,CurrentChamber) ) {
-	      IsSegmentOwnedExclusively->back()=false;
-	      IsSegmentOwnedExclusively->at(chamber)=false;
-	    }
-	  IsSegmentBestInStationByDR->back() = segmentMatch->isMask(MuonSegmentMatch::BestInStationByDR);
-	  IsSegmentBelongsToTrackByDR->back() = segmentMatch->isMask(MuonSegmentMatch::BelongsToTrackByDR);
-	  IsSegmentBelongsToTrackByCleaning->back() = segmentMatch->isMask(MuonSegmentMatch::BelongsToTrackByCleaning);
-	}
-      }//chamber loop end
-      //miscellany
-      Vertex_x->push_back(iter->vertex().X());
-      Vertex_y->push_back(iter->vertex().Y());
-      Vertex_z->push_back(iter->vertex().Z());
-      isoR03sumPt->push_back(iter->isolationR03().sumPt);
-      isoR03emEt->push_back(iter->isolationR03().emEt);
-      isoR03hadEt->push_back(iter->isolationR03().hadEt);
-      isoR03hoEt->push_back(iter->isolationR03().hoEt);
-      isoR03nJets->push_back(iter->isolationR03().nJets);
-      isoR03nTracks->push_back(iter->isolationR03().nTracks);
-      isoR05sumPt->push_back(iter->isolationR05().sumPt);
-      isoR05emEt->push_back(iter->isolationR05().emEt);
-      isoR05hadEt->push_back(iter->isolationR05().hadEt);
-      isoR05hoEt->push_back(iter->isolationR05().hoEt);
-      isoR05nJets->push_back(iter->isolationR05().nJets);
-      isoR05nTracks->push_back(iter->isolationR05().nTracks);
-      isoemVetoEt->push_back(iter->isolationR03().emVetoEt);
-      isohadVetoEt->push_back(iter->isolationR03().hadVetoEt);
-      isohoVetoEt->push_back(iter->isolationR03().hoVetoEt);
-      TrkKink->push_back(iter->combinedQuality().trkKink);
-      GlbKink->push_back(iter->combinedQuality().glbKink);
-      TrkRelChi2->push_back(iter->combinedQuality().trkRelChi2);
-      CaloE_emMax->push_back(iter->calEnergy().emMax);
-      CaloE_emS9->push_back(iter->calEnergy().emS9);
-      CaloE_emS25->push_back(iter->calEnergy().emS25);
-      CaloE_hadMax->push_back(iter->calEnergy().hadMax);
-      CaloE_hadS9->push_back(iter->calEnergy().hadS9);
-      Calo_emPos_R->push_back(iter->calEnergy().ecal_position.R());
-      Calo_emPos_eta->push_back(iter->calEnergy().ecal_position.eta());
-      Calo_emPos_phi->push_back(iter->calEnergy().ecal_position.phi());
-      Calo_hadPos_R->push_back(iter->calEnergy().hcal_position.R());
-      Calo_hadPos_eta->push_back(iter->calEnergy().hcal_position.eta());
-      Calo_hadPos_phi->push_back(iter->calEnergy().hcal_position.phi());
-      //match to RecoTrk
-      TrackRef innertrack = iter->innerTrack();
-      dEdx->push_back(dEdxTrack[innertrack].dEdx());
-      dEdxError->push_back(dEdxTrack[innertrack].dEdxError());
-      dEdx_numberOfSaturatedMeasurements->push_back(dEdxTrack[innertrack].numberOfSaturatedMeasurements());
-      dEdx_numberOfMeasurements->push_back(dEdxTrack[innertrack].numberOfMeasurements());
-      theSameWithMuon->push_back(-1);
-      InnerTrack_nValidTrackerHits->push_back(innertrack->hitPattern().numberOfValidTrackerHits());
-      InnerTrack_nValidPixelHits->push_back(innertrack->hitPattern().numberOfValidPixelHits());
-      InnerTrack_nLostPixelHits->push_back(innertrack->hitPattern().numberOfLostPixelHits());
-      InnerTrack_nLostTrackerHits->push_back(innertrack->hitPattern().numberOfLostTrackerHits());
-      InnerTrack_chi2->push_back(innertrack->chi2());
-      InnerTrack_ndof->push_back(innertrack->ndof());
-      //Match to Tracking Particle Collection
-      TrkParticles_pt->push_back(0);
-      TrkParticles_eta->push_back(0);
-      TrkParticles_phi->push_back(0);
-      TrkParticles_pdgId->push_back(0);
-      TrkParticles_charge->push_back(-100.0);
-      SharedHitsRatio->push_back(-100.0);
-      MCMatchChi2->push_back(-100.0);
-      MuonType->push_back(0);
-      NumMisMatch++;
-      unsigned int innertrack_pos;  DChains->push_back(-2);
-      vector <TheMuonType> type; FirstLayer.clear();LastLayer.clear();
-      for(innertrack_pos=0; innertrack_pos<tC.size(); innertrack_pos++)  //recotrk loop begin
-	if (innertrack == TrackRef(trackCollectionH,innertrack_pos) ) {
-	  RefToBase<Track> trk(trackCollectionHV, innertrack_pos);
-	  if (InnerTrack_nValidTrackerHits->back()<minTrackHits||RecoToSimByHits.find(trk) == RecoToSimByHits.end()||RecoToSimByChi2.find(trk) == RecoToSimByChi2.end()) break;
-	  pair<TrackingParticleRef, double>  BestMatch=RecoToSimByHits[trk].front();
-	  vector<pair<TrackingParticleRef, double> > TPCByChi2=RecoToSimByChi2[trk];
-	  vector<pair<TrackingParticleRef, double> >::iterator TPCByChi2_iter=TPCByChi2.begin();
-	  for (;TPCByChi2_iter!=TPCByChi2.end();TPCByChi2_iter++)
-	    if (BestMatch.first==TPCByChi2_iter->first) break;
-	  if (TPCByChi2_iter==TPCByChi2.end()) break;
-	  TrackingParticleRef tpr = BestMatch.first;
-	  //Simulated Tracks
-	  TrkParticles_pt->back()=tpr->pt();
-	  TrkParticles_eta->back()=tpr->eta();
-	  TrkParticles_phi->back()=tpr->phi();
-	  TrkParticles_charge->back()=tpr->charge();
-	  TrkParticles_pdgId->back()=tpr->pdgId();
-	  SharedHitsRatio->back()=BestMatch.second;
-	  MCMatchChi2->back()=-1.*TPCByChi2_iter->second;
-	  NumMisMatch--;
-	  //Get the decay chain of this track
-	  for (vector<SimTrack>::const_iterator g4Track_iter = tpr->g4Track_begin(); g4Track_iter != tpr->g4Track_end(); ++g4Track_iter )  {//g4Track loop begin
-	    DChain.clear();SimChains.clear();
-	    const SimTrack *thisTrk=&(*g4Track_iter);
-	    SimTrackDaughtersTree( thisTrk,tpr );
-	    Bool_t ChainEnd; TrackingParticleRef tpr_tmp=tpr;
-	    do {
-	      ChainEnd=true;
-	      if ( !thisTrk->noVertex() ) {
-		TrackingVertexRef tvr=tpr_tmp->parentVertex();
-		for ( TrackingParticleRefVector::iterator parenttp=tvr->sourceTracks_begin();parenttp!=tvr->sourceTracks_end();parenttp++ ) {
-		  for (vector<SimTrack>::const_iterator g4Trk_iter = (*parenttp)->g4Track_begin() ; g4Trk_iter != (*parenttp)->g4Track_end(); ++g4Trk_iter )
-		    if ( SVC[thisTrk->vertIndex()].parentIndex()==Int_t(g4Trk_iter->trackId()) && g4Trk_iter->eventId().rawId()==thisTrk->eventId().rawId()) { 
-		      thisTrk=&(*g4Trk_iter);tpr_tmp=*parenttp;
-		      vector<const SimTrack *>::iterator SavedSimTrk_iter=find(SavedSimTrk.begin(),SavedSimTrk.end(),thisTrk);
-		      if (SavedSimTrk_iter==SavedSimTrk.end())
-			{
-			  DChain.push_back(IsParInHep->size());
-			  IsParHasMuonHits->push_back(false);
-	      		  RecordSimTrack(thisTrk)
-			}
-		      else DChain.push_back(FindSimTrackRecordingPosition(SavedSimTrk_iter-SavedSimTrk.begin()));
-		      ChainEnd=false;
-		      break;
-		    }
-		  if (!ChainEnd) break;
-		}
-	      }
-	    }while (!ChainEnd);
-	    for (vector< vector<Int_t> >::iterator SimChains_iter = SimChains.begin(); SimChains_iter !=  SimChains.end(); ++SimChains_iter )
-	      SimChains_iter->insert(SimChains_iter->begin(),DChain.rbegin(),DChain.rend());
-	    DChain.clear();
-	    
-	    //HepMC Particles
-	    HepMCChains.clear();
-	    if (!thisTrk->noGenpart()) {
-	      vector<const SimTrack *>::iterator SavedSimTrk_iter=find(SavedSimTrk.begin(),SavedSimTrk.end(),thisTrk);
-	      if (SavedSimTrk_iter!=SavedSimTrk.end()) (*IsParInHep)[FindSimTrackRecordingPosition(SavedSimTrk_iter-SavedSimTrk.begin())]=true;
-	      else {ReportError(5,"Code is Wrong")}
-	      HepMC::GenEvent::particle_iterator genPar = HepGenEvent.particles_begin();
-		for (int count=1; count<thisTrk->genpartIndex()&&genPar != HepGenEvent.particles_end(); count++ )
-		  genPar++;
-		if (genPar != HepGenEvent.particles_end()) HepMCParentTree(*genPar);
-		else {ReportError(6,"genpartIndex() Error or HepMC is empty")}
-	    }
-	    //merge the HepMC and SimTrack Decay Chains
-	    for (vector< vector<Int_t> >::iterator SimChains_iter = SimChains.begin(); SimChains_iter !=  SimChains.end(); ++SimChains_iter )
-	      if ( !HepMCChains.empty() )
-		for (vector< vector<Int_t> >::iterator HepMCChains_iter = HepMCChains.begin(); HepMCChains_iter !=  HepMCChains.end(); ++HepMCChains_iter ) {
-		  vector<Int_t> thisChain(HepMCChains_iter->rbegin(),HepMCChains_iter->rend());
-		  thisChain.insert(thisChain.end(),SimChains_iter->begin(),SimChains_iter->end());
-		  SaveAndClassifyDChain(thisChain);
-		}
-	      else {SaveAndClassifyDChain((*SimChains_iter));}
-	  }//g4Track loop end
-	  Long64_t TypeRecord=0;
-	  for (vector <TheMuonType>::iterator type_iter=type.begin();type_iter!=type.end();type_iter++)
-	    if (*type_iter) TypeRecord=TypeRecord*100+Long64_t(*type_iter);
-	  MuonType->back()=TypeRecord;
-	  break;
-	}//recotrk loop end
-      if ( eta->back()>0 )
-	for ( map<Int_t,CSCSimHitInfo>::iterator SimSeg=FirstLayer.begin(); SimSeg != FirstLayer.end(); SimSeg++) {
-	  RingSimSegment->push_back( Char_t(SimSeg->first/100) );
-	  ChamberSimSegment->push_back( abs(SimSeg->first)%100 );
-	  MuonIndexSimSegment->push_back( eta->size()-1 );
-	  XSimSegment->push_back( (LastLayer[SimSeg->first].X+SimSeg->second.X)/2. );
-	  YSimSegment->push_back( (LastLayer[SimSeg->first].Y+SimSeg->second.Y)/2. );
-	}
-      else
-	for ( map<Int_t,CSCSimHitInfo>::reverse_iterator SimSeg=FirstLayer.rbegin(); SimSeg != FirstLayer.rend(); SimSeg++) {
-	  RingSimSegment->push_back( Char_t(SimSeg->first/100) );
-	  ChamberSimSegment->push_back( abs(SimSeg->first)%100 );
-	  MuonIndexSimSegment->push_back( eta->size()-1 );
-	  XSimSegment->push_back( (LastLayer[SimSeg->first].X+SimSeg->second.X)/2. );
-	  YSimSegment->push_back( (LastLayer[SimSeg->first].Y+SimSeg->second.Y)/2. );
-	}
-    }//muon loop end
+    for ( vector<CSCChamberSimHitsInfo>::iterator SimSeg=ChamberSimHits.begin();SimSeg!=ChamberSimHits.end();SimSeg++) {
+      Byte_t nhits=0;
+      for (Byte_t layer=1;layer<=6;layer++)
+	if ( SimSeg->HitsMask & 1<<layer ) nhits++;
+      if (nhits<3) continue;//require at least 3 hits to make a segment
+      NumHitsSimSegment->push_back(nhits);
+      RingSimSegment->push_back( Char_t(SimSeg->ChamberID/100) );
+      ChamberSimSegment->push_back( abs(SimSeg->ChamberID)%100 );
+      MuonIndexSimSegment->push_back( eta->size()-1 );
+      XSimSegment->push_back( (SimSeg->FirstHit_X+SimSeg->LastHit_X)/2. );
+      YSimSegment->push_back( (SimSeg->FirstHit_Y+SimSeg->LastHit_Y)/2. );
+      XErrSimSegment->push_back( abs(SimSeg->FirstHit_X-SimSeg->LastHit_X)/2. );
+      YErrSimSegment->push_back( abs(SimSeg->FirstHit_Y-SimSeg->LastHit_Y)/2. );
+    }
+  }//muon loop end
 #ifdef LocalRun
-  Bool_t Print=false;
-  /*for (vector<Int_t>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end(); DChain_iter++ )
+  /*Bool_t Print=false;
+    for (vector<Int_t>::iterator DChain_iter = TTTruthDChains->begin(); DChain_iter != TTTruthDChains->end(); DChain_iter++ )
     if (*DChain_iter==-2) 
-      for (vector<Int_t>::iterator DChain_iter2 = DChain_iter+1; DChain_iter2 != DChains->end()&&*DChain_iter2!=-2; DChain_iter2++ )
-	  for (vector<Int_t>::iterator DChain_iter3 = DChains->begin(); DChain_iter3 != DChain_iter; DChain_iter3++ )
+      for (vector<Int_t>::iterator DChain_iter2 = DChain_iter+1; DChain_iter2 != TTTruthDChains->end()&&*DChain_iter2!=-2; DChain_iter2++ )
+	  for (vector<Int_t>::iterator DChain_iter3 = TTTruthDChains->begin(); DChain_iter3 != DChain_iter; DChain_iter3++ )
 	    if (*DChain_iter2==*DChain_iter3&&*DChain_iter2>0) Print=true;
   int muref=-1;
-  for (vector<Int_t>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end(); DChain_iter++ ) {
+  for (vector<Int_t>::iterator DChain_iter = TTTruthDChains->begin(); DChain_iter != TTTruthDChains->end(); DChain_iter++ ) {
     if (*DChain_iter==-2) muref++;
-    if ((*MuonType)[muref]==21) {Print=true;break;}
+    if ((*TTTruthMuType)[muref]==21) {Print=true;break;}
     }*/
   if (true) {
     cout<<"Run "<<Info.RUN<<"; Event "<<Info.EVENT<<endl;
     for (unsigned int parref = 0; parref<Gen_pdgId->size(); parref++)
       printf("%d: %d (%3.2fcm,%3.2fcm,%3.2fcm,%3.2fns) ---(%3.3f,%3.3f,%3.3f,%3.3f)GeV/c---> %s;\n",parref,Gen_pdgId->at(parref),Gen_vx->at(parref),Gen_vy->at(parref),Gen_vz->at(parref),Gen_vt->at(parref),Gen_pt->at(parref)*cosh(Gen_eta->at(parref)),Gen_pt->at(parref)*cos(Gen_phi->at(parref)),Gen_pt->at(parref)*sin(Gen_phi->at(parref)),Gen_pt->at(parref)*sinh(Gen_eta->at(parref)),IsParInHep->at(parref)?"HEPMC":"SimTrk");
     unsigned int Muref=0;
-    for (vector<Int_t>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end(); DChain_iter++ )
+    for (vector<Int_t>::iterator TTDChain_iter = TTTruthDChains->begin(),SegDChain_iter = SegTruthDChains->begin()+1; TTDChain_iter != TTTruthDChains->end(); TTDChain_iter++ )
       {
-	if (*DChain_iter==-1) printf("\n");
-	else if (*DChain_iter==-2) {
-	  printf("\n Mu (%d): (%3.2fcm,%3.2fcm,%3.2fcm) --- (%3.2fGeV/c,%3.2f,%3.2f) ---> SameWith: Mu %d, Type",Muref,Vertex_x->at(Muref),Vertex_y->at(Muref),Vertex_z->at(Muref),pt->at(Muref)*cosh(eta->at(Muref)),eta->at(Muref),phi->at(Muref),theSameWithMuon->at(Muref));
-	  cout<<MuonType->at(Muref)<<endl;
+	if (*TTDChain_iter==-1) printf("\n");
+	else if (*TTDChain_iter==-2) {
+	  printf("\nMu (%d): (%3.2fcm,%3.2fcm,%3.2fcm) --- (%3.2fGeV/c,%3.2f,%3.2f) ---> SameWith: Mu %d\n",Muref,Vertex_x->at(Muref),Vertex_y->at(Muref),Vertex_z->at(Muref),pt->at(Muref)*cosh(eta->at(Muref)),eta->at(Muref),phi->at(Muref),theSameWithMuon->at(Muref));
+	  printf("Muon System Hits MC Truth: Type ");
+	  cout<<SegTruthMuType->at(Muref);
+	  for (; SegDChain_iter != SegTruthDChains->end() && *SegDChain_iter != -2 ; SegDChain_iter++ )
+	    if (*SegDChain_iter==-1) printf("\n");
+	    else printf("%d --> ", *SegDChain_iter);
+	  SegDChain_iter++;
+	  printf("\nTracker Track MC Truth: Type ");
+	  cout<<TTTruthMuType->at(Muref);
 	  Muref++;
 	}
-	else printf("%d --> ", *DChain_iter);
+	else printf("%d --> ", *TTDChain_iter);
       }
     printf("\n----------------------------------------------------\n");
   }
@@ -465,6 +450,210 @@ Bool_t CSCPriEff::filter(edm::Event& event, const edm::EventSetup& iSetup) {
   FirstEntry=false;
   Tracks_Tree->Fill();
 #endif
+  return true;
+}
+
+#define RecordSimTrack(thisTrk) SavedSimTrk.push_back(thisTrk);		\
+  IsParInHep->push_back(false);						\
+  IsParSavedAsHep.push_back(false);					\
+  GenSimMomentum(thisTrk->momentum().pt(),thisTrk->momentum().eta(),thisTrk->momentum().phi(),thisTrk->type());	\
+  if (!thisTrk->noVertex()) {						\
+    SimVertex thisVtx=SVC[thisTrk->vertIndex()];			\
+    GenSimVertex(thisVtx.position().x(),thisVtx.position().y(),thisVtx.position().z(),thisVtx.position().t()*1e9); \
+  }									\
+  else {GenSimVertex(0,0,0,0);}
+
+void CSCPriEff::GetDecayChains(TrackingParticleRef tpr,vector<int> *DChains, vector <TheMuonType> &type, HepMC::GenEvent &HepGenEvent) {
+  for (vector<SimTrack>::const_iterator g4Track_iter = tpr->g4Track_begin(); g4Track_iter != tpr->g4Track_end(); ++g4Track_iter )  {//g4Track loop begin
+    DChain.clear();SimChains.clear();
+    const SimTrack *thisTrk=&(*g4Track_iter);
+    SimTrackDaughtersTree( thisTrk,tpr );
+    Bool_t ChainEnd; TrackingParticleRef tpr_tmp=tpr;
+    do {
+      ChainEnd=true;
+      if ( !thisTrk->noVertex() ) {
+	TrackingVertexRef tvr=tpr_tmp->parentVertex();
+	for ( TrackingParticleRefVector::iterator parenttp=tvr->sourceTracks_begin();parenttp!=tvr->sourceTracks_end();parenttp++ ) {
+	  for (vector<SimTrack>::const_iterator g4Trk_iter = (*parenttp)->g4Track_begin() ; g4Trk_iter != (*parenttp)->g4Track_end(); ++g4Trk_iter )
+	    if ( SVC[thisTrk->vertIndex()].parentIndex()==Int_t(g4Trk_iter->trackId()) && g4Trk_iter->eventId().rawId()==thisTrk->eventId().rawId()) { 
+	      thisTrk=&(*g4Trk_iter);tpr_tmp=*parenttp;
+	      Bool_t HasMuonHits=false;
+	      for ( vector<PSimHit>::const_iterator g4Hit_iter=tpr_tmp->pSimHit_begin();g4Hit_iter!=tpr_tmp->pSimHit_end();g4Hit_iter++ )
+		if ( g4Hit_iter->trackId()==thisTrk->trackId() && g4Hit_iter->eventId().rawId()==thisTrk->eventId().rawId() && g4Hit_iter->particleType() == thisTrk->type() )      HasMuonHits=SimHitToSegment( *g4Hit_iter);
+	      vector<const SimTrack *>::iterator SavedSimTrk_iter=find(SavedSimTrk.begin(),SavedSimTrk.end(),thisTrk);
+	      if (SavedSimTrk_iter==SavedSimTrk.end())
+		{
+		  DChain.push_back(IsParInHep->size());
+		  IsParHasMuonHits->push_back(HasMuonHits);
+		  RecordSimTrack(thisTrk)
+		    }
+	      else DChain.push_back(FindSimTrackRecordingPosition(SavedSimTrk_iter-SavedSimTrk.begin()));
+	      SavedTP.push_back(tpr_tmp);
+	      ChainEnd=false;
+	      break;
+	    }
+	  if (!ChainEnd) break;
+	}
+      }
+    }while (!ChainEnd);
+    for (vector< vector<Int_t> >::iterator SimChains_iter = SimChains.begin(); SimChains_iter !=  SimChains.end(); ++SimChains_iter )
+      SimChains_iter->insert(SimChains_iter->begin(),DChain.rbegin(),DChain.rend());
+    DChain.clear();
+    
+    //HepMC Particles
+    HepMCChains.clear();
+    if (!thisTrk->noGenpart()) {
+      vector<const SimTrack *>::iterator SavedSimTrk_iter=find(SavedSimTrk.begin(),SavedSimTrk.end(),thisTrk);
+      if (SavedSimTrk_iter!=SavedSimTrk.end()) (*IsParInHep)[FindSimTrackRecordingPosition(SavedSimTrk_iter-SavedSimTrk.begin())]=true;
+      else {ReportError(5,"Code is Wrong");}
+      HepMC::GenEvent::particle_iterator genPar = HepGenEvent.particles_begin();
+      for (int count=1; count<thisTrk->genpartIndex()&&genPar != HepGenEvent.particles_end(); count++ )
+	genPar++;
+      if (genPar != HepGenEvent.particles_end()) HepMCParentTree(*genPar);
+      else {ReportError(6,"genpartIndex() Error or HepMC is empty");}
+    }
+    
+#define SaveAndClassifyDChain(thisChain) int Muref=-1;			\
+    for (vector<int>::iterator DChain_iter = DChains->begin(); DChain_iter != DChains->end()&&Muref<(int) eta->size()-1; DChain_iter++ ) { \
+      if (*DChain_iter==-1) {						\
+	DChain_iter++;							\
+	vector<int>::iterator DChain_begin=DChain_iter;			\
+	for (; DChain_iter != DChains->end()&&*DChain_iter!=-2&&*DChain_iter!=-1; DChain_iter++ ) ; \
+	if (DChain_begin!=DChain_iter)					\
+	  if (IstheSameDChain(thisChain,* new vector<int> (DChain_begin,DChain_iter))) { \
+	    theSameWithMuon->back()=Muref;				\
+	    break;							\
+	  }								\
+	DChain_iter--;							\
+      }									\
+      if (*DChain_iter==-2) Muref++;					\
+    }									\
+    DChains->push_back(-1);						\
+    DChains->insert(DChains->end(),thisChain.begin(),thisChain.end());	\
+    TheMuonType newtype=classification(thisChain);			\
+    if ( type.empty() ) type.push_back(newtype);			\
+    else if ( type.size()==1 && type.back()==Others ) type.back()=newtype; \
+    else if ( type.size()==1 && type.back()==NoMuSysHit && newtype!=Others ) type.back()=newtype; \
+    else if (find(type.begin(),type.end(),newtype)==type.end() && newtype!=Others && newtype!=NoMuSysHit ) type.push_back(newtype)
+    
+    //merge the HepMC and SimTrack Decay Chains
+    for (vector< vector<Int_t> >::iterator SimChains_iter = SimChains.begin(); SimChains_iter !=  SimChains.end(); ++SimChains_iter )
+      if ( !HepMCChains.empty() )
+	for (vector< vector<Int_t> >::iterator HepMCChains_iter = HepMCChains.begin(); HepMCChains_iter !=  HepMCChains.end(); ++HepMCChains_iter ) {
+	  vector<Int_t> thisChain(HepMCChains_iter->rbegin(),HepMCChains_iter->rend());
+	  thisChain.insert(thisChain.end(),SimChains_iter->begin(),SimChains_iter->end());
+	  SaveAndClassifyDChain(thisChain);
+	}
+      else {SaveAndClassifyDChain((*SimChains_iter));}
+  }//g4Track loop end
+}
+
+void CSCPriEff::SimTrackDaughtersTree(const SimTrack * thisTrk, TrackingParticleRef tpr)
+{
+  // Find MC Truth Segment - the offical one use chi2 to match simtrk (MuonIdTruthInfo.cc) and it won't know the decay in flight segment truth
+  // The particle type of the hit may differ from the particle type of the SimTrack with id trackId().
+  // This happends if the hit was created by a secondary track(e.g. a delta ray) originating from the trackId() and not existing as aseparate SimTrack.
+  // ( particle type match notice is from haiyun.teng@cern.ch )
+  Bool_t ChainEnd=true, HasMuonHits=false;
+  for ( vector<PSimHit>::const_iterator g4Hit_iter=tpr->pSimHit_begin();g4Hit_iter!=tpr->pSimHit_end();g4Hit_iter++ )
+    if ( g4Hit_iter->trackId()==thisTrk->trackId() && g4Hit_iter->eventId().rawId()==thisTrk->eventId().rawId() && g4Hit_iter->particleType() == thisTrk->type() )      HasMuonHits=SimHitToSegment( *g4Hit_iter);
+  
+  //To avoid duplicate particle saving
+  vector<const SimTrack *>::iterator SavedSimTrk_iter=find(SavedSimTrk.begin(),SavedSimTrk.end(),thisTrk);
+  if (SavedSimTrk_iter==SavedSimTrk.end()) {
+      DChain.push_back(IsParInHep->size());
+      IsParHasMuonHits->push_back(HasMuonHits);
+      RecordSimTrack(thisTrk)
+  }
+  else DChain.push_back(FindSimTrackRecordingPosition(SavedSimTrk_iter-SavedSimTrk.begin()));
+  SavedTP.push_back(tpr);
+
+  for ( TrackingVertexRefVector::iterator tvr=tpr->decayVertices().begin();tvr!=tpr->decayVertices().end();tvr++ )
+    for ( TrackingParticleRefVector::iterator daughtertp=(*tvr)->daughterTracks_begin();daughtertp!=(*tvr)->daughterTracks_end();daughtertp++ )
+      for (vector<SimTrack>::const_iterator g4Trk_iter = (*daughtertp)->g4Track_begin() ; g4Trk_iter != (*daughtertp)->g4Track_end(); ++g4Trk_iter )
+	if ( SVC[g4Trk_iter->vertIndex()].parentIndex()==Int_t(thisTrk->trackId()) && g4Trk_iter->eventId().rawId()==thisTrk->eventId().rawId()) { 
+	  ChainEnd=false;
+	  SimTrackDaughtersTree( &(*g4Trk_iter), *daughtertp );
+	}
+  
+  if (ChainEnd) SimChains.push_back(DChain);
+  DChain.pop_back();
+}
+
+void CSCPriEff::HepMCParentTree(HepMC::GenParticle *genPar) {
+  HepMC::GenVertex *thisVtx = genPar->production_vertex();
+  Bool_t ChainEnd=true;
+  if (thisVtx) {
+      for (HepMC::GenVertex::particles_in_const_iterator pgenD = thisVtx->particles_in_const_begin(); pgenD != thisVtx->particles_in_const_end(); ++pgenD)
+	if ((*pgenD)->pdg_id()!=92)  {//Pythia special code for string, we only care about the particles after hadronization
+	  ChainEnd=false;
+	  vector<HepMC::GenParticle *>::iterator SavedHepPar_iter=find(SavedHepPar.begin(),SavedHepPar.end(),*pgenD);
+	  if (SavedHepPar_iter==SavedHepPar.end())
+	    {
+	      DChain.push_back(IsParInHep->size());
+	      IsParHasMuonHits->push_back(false);
+	      RecordHepMC((*pgenD))
+	    }
+	  else DChain.push_back(FindHepMCRecordingPosition(SavedHepPar_iter-SavedHepPar.begin()));
+	  HepMCParentTree(*pgenD);
+	  DChain.pop_back();
+	}
+  }
+  if (ChainEnd) HepMCChains.push_back(DChain);
+}
+
+//changed from MuonIdTruthInfo.cc: that one saves the layer but not chamber infomation, the return value is whether or not it is hit in muon system
+Bool_t CSCPriEff::SimHitToSegment(const PSimHit& hit) {
+   // find the hit position projection at the reference surface of the layer:
+   // first get entry and exit point of the hit in the global coordinates, then
+   // get local coordinates of these points wrt the chamber and then find the
+   // projected X-Y coordinates
+  DetId DetectorId( hit.detUnitId() );
+  if ( DetectorId.det() != DetId::Muon ) return false;
+  if ( DetectorId.subdetId() != MuonSubdetId::CSC ) return true;
+  const CSCDetId CSCChamberID( hit.detUnitId() );
+  Byte_t thisLayer=CSCChamberID.layer();
+  Int_t ThisChamber=CSCChamberID.station()*10+CSCChamberID.ring();
+  //reject non-existing CSC Chambers (incorrect geometry) In ME42, only ME+42/9-13 exist
+  if ( ThisChamber==-42 ) return true;
+  if ( ThisChamber==42 && ( CSCChamberID.chamber()<9 || CSCChamberID.chamber()>13 ) ) return true;
+
+  ThisChamber=ThisChamber*100+CSCChamberID.chamber();
+  if ( CSCChamberID.endcap()==2 ) ThisChamber=-ThisChamber;
+
+  Local3DPoint entryPoint = hit.entryPoint(), exitPoint = hit.exitPoint();
+  LocalVector direction = exitPoint - entryPoint;
+  if ( fabs(direction.z()) <= 0.001) return true;//won't save as sim seg. It is not a good sim hit, but it is a muon hit
+  LocalPoint projection = entryPoint - direction*(entryPoint.z()/direction.z());
+  if ( fabs(projection.z()) > 0.001 ) {
+    ReportError(2,"z coordinate of the hit projection must be zero and it's not!");
+    return true;
+  }
+  
+  vector<CSCChamberSimHitsInfo>::iterator thisChamberSimHits=ChamberSimHits.end(); Float_t DR2=64.;//max 8 cm to consider that they are in the same segment
+  for ( vector<CSCChamberSimHitsInfo>::iterator ChamberSimHits_iter=ChamberSimHits.begin();ChamberSimHits_iter!=ChamberSimHits.end();ChamberSimHits_iter++)
+    if ( ChamberSimHits_iter->ChamberID==ThisChamber ) 
+      if ( ! (1<<thisLayer & ChamberSimHits_iter->HitsMask) ) {
+	Float_t new_DR2=pow(projection.x()-(ChamberSimHits_iter->FirstHit_X+ChamberSimHits_iter->LastHit_X)/2.,2)+pow(projection.y()-(ChamberSimHits_iter->FirstHit_Y+ChamberSimHits_iter->LastHit_Y)/2.,2);
+	if ( new_DR2<DR2 ) {
+	  DR2=new_DR2;
+	  thisChamberSimHits=ChamberSimHits_iter;
+	}
+      }
+
+  if ( thisChamberSimHits == ChamberSimHits.end() ) {
+    ChamberSimHits.push_back( CSCChamberSimHitsInfo( ThisChamber,projection.x(),projection.y(),projection.x(),projection.y(),1<<thisLayer ) );
+    return true;
+  }
+  thisChamberSimHits->HitsMask |= 1<<thisLayer;
+  if ( ! (thisChamberSimHits->HitsMask>>thisLayer) ) {
+    thisChamberSimHits->LastHit_X=projection.x();
+    thisChamberSimHits->LastHit_Y=projection.y();
+  }
+  else if ( ! (thisChamberSimHits->HitsMask<<(8-thisLayer) ) ) {
+    thisChamberSimHits->FirstHit_X=projection.x();
+    thisChamberSimHits->FirstHit_Y=projection.y();
+  }
   return true;
 }
 
@@ -559,104 +748,8 @@ CSCPriEff::TheMuonType CSCPriEff::classification(vector<Int_t> &Chain)
   return Others;
 }
 
-void CSCPriEff::SimTrackDaughtersTree(const SimTrack * thisTrk, TrackingParticleRef tpr)
-{
-  // Find MC Truth Segment - the offical one use chi2 to match simtrk (MuonIdTruthInfo.cc) and it won't know the decay in flight segment truth
-  // The particle type of the hit may differ from the particle type of the SimTrack with id trackId().
-  // This happends if the hit was created by a secondary track(e.g. a delta ray) originating from the trackId() and not existing as aseparate SimTrack.
-  // ( particle type match notice is from haiyun.teng@cern.ch )
-  Bool_t ChainEnd=true, HasMuonHits=false;
-  for ( vector<PSimHit>::const_iterator g4Hit_iter=tpr->pSimHit_begin();g4Hit_iter!=tpr->pSimHit_end();g4Hit_iter++ )
-    if ( g4Hit_iter->trackId()==thisTrk->trackId() && g4Hit_iter->eventId().rawId()==thisTrk->eventId().rawId() && g4Hit_iter->particleType() == thisTrk->type() )      HasMuonHits=SimHitToSegment( *g4Hit_iter);
-  
-  //To avoid duplicate particle saving
-  vector<const SimTrack *>::iterator SavedSimTrk_iter=find(SavedSimTrk.begin(),SavedSimTrk.end(),thisTrk);
-  if (SavedSimTrk_iter==SavedSimTrk.end()) {
-      DChain.push_back(IsParInHep->size());
-      IsParHasMuonHits->push_back(HasMuonHits);
-      RecordSimTrack(thisTrk)
-  }
-  else DChain.push_back(FindSimTrackRecordingPosition(SavedSimTrk_iter-SavedSimTrk.begin()));
- 
-  for ( TrackingVertexRefVector::iterator tvr=tpr->decayVertices().begin();tvr!=tpr->decayVertices().end();tvr++ )
-    for ( TrackingParticleRefVector::iterator daughtertp=(*tvr)->daughterTracks_begin();daughtertp!=(*tvr)->daughterTracks_end();daughtertp++ )
-      for (vector<SimTrack>::const_iterator g4Trk_iter = (*daughtertp)->g4Track_begin() ; g4Trk_iter != (*daughtertp)->g4Track_end(); ++g4Trk_iter )
-	if ( SVC[g4Trk_iter->vertIndex()].parentIndex()==Int_t(thisTrk->trackId()) && g4Trk_iter->eventId().rawId()==thisTrk->eventId().rawId()) { 
-	  ChainEnd=false;
-	  SimTrackDaughtersTree( &(*g4Trk_iter), *daughtertp );
-	}
-  
-  if (ChainEnd) SimChains.push_back(DChain);
-  DChain.pop_back();
-}
-//changed from MuonIdTruthInfo.cc: that one saves the layer but not chamber infomation, the return value is whether or not it is hit in muon system
-Bool_t CSCPriEff::SimHitToSegment(const PSimHit& hit) {
-   // find the hit position projection at the reference surface of the layer:
-   // first get entry and exit point of the hit in the global coordinates, then
-   // get local coordinates of these points wrt the chamber and then find the
-   // projected X-Y coordinates
-  DetId DetectorId( hit.detUnitId() );
-  if ( DetectorId.det() != DetId::Muon ) return false;
-  if ( DetectorId.subdetId() != MuonSubdetId::CSC ) return true;
-  const CSCDetId CSCChamberID( hit.detUnitId() );
-  Byte_t thisLayer=CSCChamberID.layer();
-  Int_t ThisChamber=CSCChamberID.station()*10+CSCChamberID.ring();
-  //reject non-existing CSC Chambers (incorrect geometry) In ME42, only ME+42/9-13 exist
-  if ( ThisChamber==-42 ) return true;
-  if ( ThisChamber==42 && ( CSCChamberID.chamber()<9 || CSCChamberID.chamber()>13 ) ) return true;
-
-  Bool_t SaveToFirstLayer=false,SaveToLastLayer=false;
-  ThisChamber=ThisChamber*100+CSCChamberID.chamber();
-  if ( CSCChamberID.endcap()==2 ) ThisChamber=-ThisChamber;
-  map<Int_t,CSCSimHitInfo>::iterator thisChamberFirstLayer=FirstLayer.find(ThisChamber),thisChamberLastLayer=LastLayer.find(ThisChamber);
-  if ( thisChamberFirstLayer!=FirstLayer.end() ) {
-    if ( thisLayer<thisChamberFirstLayer->second.Layer) SaveToFirstLayer=true;
-  }
-  else SaveToFirstLayer=true;
-  if ( thisChamberLastLayer!=LastLayer.end() ) {
-    if ( thisLayer>thisChamberLastLayer->second.Layer) SaveToLastLayer=true;
-  }
-  else SaveToLastLayer=true;
-  if ( !SaveToFirstLayer && !SaveToLastLayer ) return true;
-  //  cerr<<"Layer: "<<CSCChamberID.layer()<<endl;
-  Local3DPoint entryPoint = hit.entryPoint(), exitPoint = hit.exitPoint();
-  LocalVector direction = exitPoint - entryPoint;
-  if ( fabs(direction.z()) > 0.001) {
-    LocalPoint projection = entryPoint - direction*(entryPoint.z()/direction.z());
-    if ( fabs(projection.z()) > 0.001 ) {ReportError(2,"z coordinate of the hit projection must be zero and it's not!")}
-    CSCSimHitInfo thisCSCSimHit={projection.x(),projection.y(),thisLayer};
-    if (SaveToFirstLayer) FirstLayer[ThisChamber]=thisCSCSimHit;
-    if (SaveToLastLayer) LastLayer[ThisChamber]=thisCSCSimHit;
-  }
-  return true;
-}
-
-void CSCPriEff::HepMCParentTree(HepMC::GenParticle *genPar) {
-  HepMC::GenVertex *thisVtx = genPar->production_vertex();
-  Bool_t ChainEnd=true;
-  if (thisVtx) {
-      for (HepMC::GenVertex::particles_in_const_iterator pgenD = thisVtx->particles_in_const_begin(); pgenD != thisVtx->particles_in_const_end(); ++pgenD)
-	if ((*pgenD)->pdg_id()!=92)  {//Pythia special code for string, we only care about the particles after hadronization
-	  ChainEnd=false;
-	  vector<HepMC::GenParticle *>::iterator SavedHepPar_iter=find(SavedHepPar.begin(),SavedHepPar.end(),*pgenD);
-	  if (SavedHepPar_iter==SavedHepPar.end())
-	    {
-	      DChain.push_back(IsParInHep->size());
-	      IsParHasMuonHits->push_back(false);
-	      RecordHepMC((*pgenD))
-	    }
-	  else DChain.push_back(FindHepMCRecordingPosition(SavedHepPar_iter-SavedHepPar.begin()));
-	  HepMCParentTree(*pgenD);
-	  DChain.pop_back();
-	}
-  }
-  if (ChainEnd) HepMCChains.push_back(DChain);
-}
-
 void CSCPriEff::ClearVecs() {
-//clear all the other vectors except pt
-//  MyMuons->clear();
-  eta->clear();  phi->clear();  chargeMinus->clear();
+  pt->clear(); eta->clear();  phi->clear();  chargeMinus->clear();
   isGlobalMu->clear();  isTrackerMu->clear();
   Vertex_x->clear();  Vertex_y->clear();  Vertex_z->clear();
   isoR03sumPt->clear();  isoR03emEt->clear();  isoR03hadEt->clear();
@@ -680,11 +773,12 @@ void CSCPriEff::ClearVecs() {
   TrackDistToChamberEdge->clear();  TrackDistToChamberEdgeErr->clear();
   XTrack->clear();YTrack->clear();  XErrTrack->clear();YErrTrack->clear();
   Ring->clear();Chamber->clear();MuonIndex->clear();
+  //LCT
   NumberOfLCTsInChamber->clear();
+  XLCT->clear();  YLCT->clear();
   //Segment
   XSegment->clear();  YSegment->clear();
   XErrSegment->clear();  YErrSegment->clear();
-  DRTrackToSegment->clear();  DRErrTrackToSegment->clear();
   IsSegmentOwnedExclusively->clear();  IsSegmentBestInStationByDR->clear();
   IsSegmentBelongsToTrackByDR->clear();  IsSegmentBelongsToTrackByCleaning->clear();
   NumberOfHitsInSegment->clear();
@@ -692,6 +786,8 @@ void CSCPriEff::ClearVecs() {
   //SimSegment
   RingSimSegment->clear(); ChamberSimSegment->clear();  MuonIndexSimSegment->clear();
   XSimSegment->clear(); YSimSegment->clear();
+  XErrSimSegment->clear(); YErrSimSegment->clear();
+  NumHitsSimSegment->clear();
   //Primary Vertex
   vx->clear();   vxError->clear();
   vy->clear();   vyError->clear();
@@ -710,7 +806,8 @@ void CSCPriEff::ClearVecs() {
 
   SavedSimTrk.clear(); SavedHepPar.clear(); IsParSavedAsHep.clear();
   IsParInHep->clear(); IsParHasMuonHits->clear();
-  DChains->clear(); theSameWithMuon->clear(); MuonType->clear();
+  TTTruthDChains->clear(); TTTruthMuType->clear(); theSameWithMuon->clear();
+  SegTruthDChains->clear(); SegTruthMuType->clear(); theSameWithMuon->clear();
 }
 
 #define MakeVecBranch(Name,Var,Type) Var=new vector<Type>();Tracks_Tree->Branch(Name,&Var)
@@ -780,14 +877,15 @@ CSCPriEff::CSCPriEff(const edm::ParameterSet& pset) {
   MakeVecBranch("Ring",Ring,Char_t);
   MakeVecBranch("Chamber",Chamber,Byte_t);
   MakeVecBranch("MuonIndex",MuonIndex,Byte_t);
+  //CSC LCT Information
   MakeVecBranch("NumberOfLCTsInChamber",NumberOfLCTsInChamber,Byte_t);
+  MakeVecBranch("XLCT",XLCT,Float_t);
+  MakeVecBranch("YLCT",YLCT,Float_t);
   //Muon Segment Information
   MakeVecBranch("XSegment",XSegment,Float_t);
   MakeVecBranch("YSegment",YSegment,Float_t);
   MakeVecBranch("XErrSegment",XErrSegment,Float_t);
   MakeVecBranch("YErrSegment",YErrSegment,Float_t);
-  MakeVecBranch("DRTrackToSegment",DRTrackToSegment,Float_t);
-  MakeVecBranch("DRErrTrackToSegment",DRErrTrackToSegment,Float_t);
   MakeVecBranch("IsSegmentOwnedExclusively",IsSegmentOwnedExclusively,Bool_t);
   MakeVecBranch("IsSegmentBestInStationByDR",IsSegmentBestInStationByDR,Bool_t);
   MakeVecBranch("IsSegmentBelongsToTrackByDR",IsSegmentBelongsToTrackByDR,Bool_t);
@@ -798,8 +896,11 @@ CSCPriEff::CSCPriEff(const edm::ParameterSet& pset) {
   MakeVecBranch("RingSimSegment",RingSimSegment,Char_t);
   MakeVecBranch("ChamberSimSegment",ChamberSimSegment,Byte_t);
   MakeVecBranch("MuonIndexSimSegment",MuonIndexSimSegment,Byte_t);
+  MakeVecBranch("NumHitsSimSegment",NumHitsSimSegment,Byte_t);
   MakeVecBranch("XSimSegment",XSimSegment,Float_t);
   MakeVecBranch("YSimSegment",YSimSegment,Float_t);
+  MakeVecBranch("XErrSimSegment",XErrSimSegment,Float_t);
+  MakeVecBranch("YErrSimSegment",YErrSimSegment,Float_t);
   //PV
   MakeVecBranch("PVx",vx,Float_t);  MakeVecBranch("PVy",vy,Float_t);  MakeVecBranch("PVz",vz,Float_t);
   MakeVecBranch("PVxError",vxError,Float_t);  MakeVecBranch("PVyError",vyError,Float_t);  MakeVecBranch("PVzError",vzError,Float_t);
@@ -815,8 +916,11 @@ CSCPriEff::CSCPriEff(const edm::ParameterSet& pset) {
   MakeVecBranch("TrkParticles_pt",TrkParticles_pt,Float_t);  MakeVecBranch("TrkParticles_eta",TrkParticles_eta,Float_t);  MakeVecBranch("TrkParticles_phi",TrkParticles_phi,Float_t); MakeVecBranch("TrkParticles_charge",TrkParticles_charge,Int_t);
   MakeVecBranch("TrkParticles_pdgId",TrkParticles_pdgId,Int_t);  MakeVecBranch("SharedHitsRatio",SharedHitsRatio,Double_t);
   MakeVecBranch("MCMatchChi2",MCMatchChi2,Double_t);
-  MakeVecBranch("DChains",DChains,Int_t); MakeVecBranch("theSameWithMuon",theSameWithMuon,Int_t);
-  MakeVecBranch("MuonType",MuonType,Long64_t);
+  MakeVecBranch("TTTruthDChains",TTTruthDChains,Int_t);
+  MakeVecBranch("TTTruthMuType",TTTruthMuType,Long64_t);
+  MakeVecBranch("SegTruthDChains",SegTruthDChains,Int_t);
+  MakeVecBranch("SegTruthMuType",SegTruthMuType,Long64_t);
+  MakeVecBranch("theSameWithMuon",theSameWithMuon,Int_t);
   //Cuts
   num_Cuts=Cuts.size();
   for (unsigned int whichcut=0;whichcut<num_Cuts;whichcut++) 
