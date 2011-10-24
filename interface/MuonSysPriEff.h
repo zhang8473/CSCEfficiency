@@ -132,7 +132,7 @@ class MuonSysPriEff : public EDAnalyzer {
   }
 #endif
   //-------------control parameters------------
-  Bool_t FirstEvent,IsMC,HasDigi,ThrowBadEvents;
+  Bool_t FirstEvent,IsMC,HasDigi,HasTrackingParticle,ThrowBadEvents;
   TriggerResultsFilter *HLTFilter;
   GoodVertexFilter *VertexFilter;
   FilterOutScraping *ScrapingFilter;
@@ -152,7 +152,7 @@ class MuonSysPriEff : public EDAnalyzer {
   Int_t numberOfPUVertices;
   //Muon
   Float_t MuonPtCut,MuonEtaMin,MuonEtaMax,MinNumberOfMuons,DiMuonInvarMassCut;
-  vector<Float_t> *pt,*eta,*phi,*Vertex_x,*Vertex_y,*Vertex_z,*isoR03sumPt,*isoR05sumPt,*normalizedChi2,*TrkRelChi2,*dEdx,*dEdxError,*TrkKink,*GlbKink;
+  vector<Float_t> *pt,*eta,*phi,*ptError,*etaError,*phiError,*Vertex_x,*Vertex_y,*Vertex_z,*isoR03sumPt,*isoR05sumPt,*normalizedChi2,*TrkRelChi2,*dEdx,*dEdxError,*TrkKink,*GlbKink;
   vector<Bool_t> *chargeMinus,*isGlobalMu,*isTrackerMu,*IsPUTrack;
   vector<Int_t> *dEdx_numberOfSaturatedMeasurements,*dEdx_numberOfMeasurements,*numberOfMatchedSegments,*numberOfMatchedStations;
 #ifdef DimuonAnalysis
@@ -163,7 +163,7 @@ class MuonSysPriEff : public EDAnalyzer {
   edm::InputTag tracksTag;
   string dEdxTag;
   vector<UInt_t> *InnerTrack_nValidTrackerHits,*InnerTrack_nValidPixelHits,*InnerTrack_nLostTrackerHits,*InnerTrack_nLostPixelHits,*InnerTrack_ndof,*GlobalTrack_ndof,*numberOfValidMuonHits;
-  vector<Float_t> *InnerTrack_chi2,*GlobalTrack_chi2,*DXYwtBS,*DXYwtPV,*DXYErrwtPV;
+  vector<Float_t> *InnerTrack_chi2,*GlobalTrack_chi2,*DXYwtBS,*DZwtBS,*DXYwtPV,*DXYErrwtPV;
   //CSC Digis
   edm::InputTag CSCDigisTag;
   //Muon Selectors
@@ -229,8 +229,6 @@ class MuonSysPriEff : public EDAnalyzer {
   //Others
   ULong64_t NumMisMatch;
 #endif
-
-  Float_t HepMCFourVec[4];
   vector<Float_t> *Gen_pt,*Gen_eta,*Gen_phi,*Gen_vx,*Gen_vy,*Gen_vz,*Gen_vt;
   vector<Int_t> *Gen_pdgId;
   string HepMCTag;

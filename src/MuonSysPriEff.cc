@@ -17,6 +17,7 @@
 #include "../interface/MuonSysPriEff.h"
 #define Muon_Mass 0.105658367
 
+#ifdef TrackingParticles
 #define trackIdLink(TrkID)  vector<SimTrack>::iterator Trk_iter = STC.begin(); \
   for (; Trk_iter != STC.end(); ++Trk_iter )	\
     if ((int) Trk_iter->trackId() == (int) TrkID) break;		\
@@ -36,7 +37,6 @@
   }									\
   else {GenSimVertex(0,0,0,0);}
 
-#ifdef TrackingParticles
 #define RecordHepMC(GenParticle) SavedHepPar.push_back(GenParticle);	\
   IsParInHep->push_back(true);						\
   GenSimMomentum(sqrt(GenParticle->momentum().px()*GenParticle->momentum().px()+GenParticle->momentum().py()*GenParticle->momentum().py()),GenParticle->momentum().eta(),GenParticle->momentum().phi(),GenParticle->pdg_id()); \
@@ -55,6 +55,39 @@
 
 void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSetup) {
   NumberOfEvents++;
+//####in the first event, check the special event content which we may want####
+  //IsMC?HasDigi? based on event content
+  //CSC LCT Digis
+  edm::Handle<CSCCorrelatedLCTDigiCollection> CSCLCTs;
+  if (FirstEvent) {
+    //Is it Data or MC?
+    Handle<edm::HepMCProduct> HepMCH;
+    event.getByLabel(HepMCTag, HepMCH);
+    if (HepMCH.failedToGet()){
+      LogInfo("DataFormat")<<"It is real data. HepMC collection is disabled";
+      if ( !event.isRealData() ) LogWarning("DataLost")<<"Corrupted MC samples! HepMC collection is missing";
+      IsMC=false;
+    }
+    //Does it has Muon Digis information?(reconstructed from RAW?)
+    try{
+      event.getByLabel(CSCDigisTag,CSCLCTs);
+    }
+    catch (cms::Exception){
+      LogWarning("DataFormat")<< "Can't get CSC-LCTdigi by label. ";
+      HasDigi=false;
+    }
+    //Does it has TrackingParticle collection? (RAWDEBUG,RECODEBUG or tracking particle building process has been taken)
+    if (IsMC) {
+      try{
+	Handle<TrackingParticleCollection> TPTest;
+	event.getByType(TPTest);
+      }catch (cms::Exception){
+	LogWarning("DataFormat")<< "No tracking particle collection is found.";
+	HasTrackingParticle=false;
+      }
+    }
+    FirstEvent=false;
+  }
   //########## preselect muons according to optimized pt() #####################
   Handle<reco::MuonCollection> Muon;
   event.getByLabel("muons", Muon);
@@ -91,48 +124,15 @@ void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSet
   isHLTTriggerred=HLTFilter->TriggerFilter(event,iSetup);
   isGoodVertex=VertexFilter->filter(event,iSetup);
   isNoScrapping=ScrapingFilter->filter(event);
-  if (ThrowBadEvents&&(!isHLTTriggerred||!isGoodVertex||!isNoScrapping)) return;
+  if (ThrowBadEvents&&( (IsMC&&!isHLTTriggerred) ||!isGoodVertex||!isNoScrapping)) return;//We keep all triggerred data with good vertex and no scrapping
 //########## Generation Information #####################
-  //IsMC?HasDigi? based on event content
-  //CSC LCT Digis
-  edm::Handle<CSCCorrelatedLCTDigiCollection> CSCLCTs;
-  if (FirstEvent) {
-    Handle<edm::HepMCProduct> HepMCH;
-    event.getByLabel(HepMCTag, HepMCH);
-    if (HepMCH.failedToGet()){
-      LogInfo("DataFormat")<<"It is real data. HepMC collection is disabled";
-      if ( !event.isRealData() ) LogWarning("DataLost")<<"Corrupted MC samples! HepMC collection is missing";
-      IsMC=false;
-    }
-    try{
-      event.getByLabel(CSCDigisTag,CSCLCTs);
-    }
-    catch (cms::Exception){
-      LogError("DataFormat")<< "Can't get CSC-LCTdigi by label. ";
-      HasDigi=false;
-    }
-    FirstEvent=false;
-  }
-  
+ 
   HepMC::GenEvent *HepGenEvent=NULL;
   if (IsMC) {
     ClearVecs_HepMC();
     Handle<edm::HepMCProduct> HepMCH;
     event.getByLabel(HepMCTag, HepMCH);
-    for (unsigned int i=0;i<4;i++)
-      HepMCFourVec[i]=999999.;
-    HepMC::GenEvent::particle_iterator GenParticle_iter = HepGenEvent->particles_begin();
-    for (;GenParticle_iter != HepGenEvent->particles_end();GenParticle_iter++) { 
-      HepMC::GenVertex *thisVtx=(*GenParticle_iter)->production_vertex();
-      if (thisVtx) {
-	HepMCFourVec[0]=thisVtx->position().x()/10.;
-	HepMCFourVec[1]=thisVtx->position().y()/10.;
-	HepMCFourVec[2]=thisVtx->position().z()/10.;
-	HepMCFourVec[3]=thisVtx->position().t()/299.792458;
-	break;
-      }
-    }
-    if (GenParticle_iter == HepGenEvent->particles_end()) LogWarning("DataLost")<<"No HepMC(Core) Vertex Information";
+    HepGenEvent=new HepMC::GenEvent(*(HepMCH->GetEvent()));
     Handle<GenEventInfoProduct> hEvtInfo;
     event.getByLabel("generator", hEvtInfo);
     GenEventWeight = hEvtInfo->weight();
@@ -227,7 +227,7 @@ void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSet
   //TrackingParticles
   Handle<TrackingParticleCollection> TPCollectionH ;
   RecoToSimCollection RecoToSimByHits,RecoToSimByChi2;
-  if (IsMC) {
+  if (IsMC&&HasTrackingParticle) {
     //Simulated Vertices
     event.getByLabel("g4SimHits", SVCollectionH);
     SVC = *SVCollectionH.product();
@@ -273,37 +273,33 @@ void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSet
     reco::MuonCollection::const_iterator iter=iter_queue->first;
     //muon basic information (pt,eta,phi,charge)
     //Global Muon uses Cocktail track selection, Track Muon uses tracker track
+    TrackRef theMuonTrack;
     TrackRef InnerTrack = iter->innerTrack();
-    TrackRef GlobalTrack = iter->globalTrack();
-    if ( InnerTrack.isNull() ) continue;
     if ( iter->isGlobalMuon() ) {
-      GlobalTrack = muon::tevOptimized(GlobalTrack, InnerTrack, tevMap1, tevMap2, tevMap3);//change the global track to the optimized track (TuneP algo)
-      pt->push_back(GlobalTrack->pt());
-      eta->push_back(GlobalTrack->eta());
-      phi->push_back(GlobalTrack->phi());
+      theMuonTrack = muon::tevOptimized(iter->globalTrack(), InnerTrack, tevMap1, tevMap2, tevMap3);//change the global track to the optimized track (TuneP algo)
       isTrackerMu->push_back(iter->isTrackerMuon());
       isGlobalMu->push_back(true);
+      numberOfValidMuonHits->push_back( theMuonTrack->hitPattern().numberOfValidMuonHits() );
+      GlobalTrack_chi2->push_back(theMuonTrack->chi2());
+      GlobalTrack_ndof->push_back(theMuonTrack->ndof());
     }
     else {
       if ( iter->isTrackerMuon() ) {
-	pt->push_back(iter->pt());
-	eta->push_back(iter->eta());
-	phi->push_back(iter->phi());
+	theMuonTrack=InnerTrack;
 	isTrackerMu->push_back(true);
 	isGlobalMu->push_back(false);
+	numberOfValidMuonHits->push_back(0);
+	GlobalTrack_chi2->push_back(0);
+	GlobalTrack_ndof->push_back(0);
       }
       else continue;
     }
-    if (GlobalTrack.isNonnull()) {
-      numberOfValidMuonHits->push_back( GlobalTrack->hitPattern().numberOfValidMuonHits() );
-      GlobalTrack_chi2->push_back(GlobalTrack->chi2());
-      GlobalTrack_ndof->push_back(GlobalTrack->ndof());
-    }
-    else {
-      numberOfValidMuonHits->push_back(0);
-      GlobalTrack_chi2->push_back(0);
-      GlobalTrack_ndof->push_back(0);
-    } 
+    pt->push_back(theMuonTrack->pt());
+    ptError->push_back(theMuonTrack->ptError());
+    eta->push_back(theMuonTrack->eta());
+    etaError->push_back(theMuonTrack->etaError());
+    phi->push_back(theMuonTrack->phi());
+    phiError->push_back(theMuonTrack->phiError());
     if (iter->charge()==-1) chargeMinus->push_back(true);
     else chargeMinus->push_back(false);
     //Muon Selectors
@@ -338,7 +334,6 @@ void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSet
     GlbKink->push_back(iter->combinedQuality().glbKink);
     //Combined track quality
     TrkRelChi2->push_back(iter->combinedQuality().trkRelChi2);
-
    //match to RecoTrk
     dEdx->push_back(dEdxTrack[InnerTrack].dEdx());
     dEdxError->push_back(dEdxTrack[InnerTrack].dEdxError());
@@ -352,12 +347,11 @@ void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSet
     InnerTrack_ndof->push_back(InnerTrack->ndof());
     //DXY using beamspot
     DXYwtBS->push_back( InnerTrack->dxy(beamSpotHandle->position()) );
+    DZwtBS->push_back( InnerTrack->dz(beamSpotHandle->position()) );
     //DXY using first PV
     std::pair<bool,Measurement1D> result = IPTools::absoluteTransverseImpactParameter(trackBuilder->build(InnerTrack),recVtxs->at(0));
     DXYwtPV->push_back( result.second.value() );
     DXYErrwtPV->push_back( result.second.error() );
-    //PUTrack?
-    IsPUTrack->push_back(false);
 
 //#################Muon Chambers#######################
     vector<const MuonChamberMatch *> Chambers;
@@ -499,20 +493,20 @@ void MuonSysPriEff::analyze(const edm::Event& event, const edm::EventSetup& iSet
     }//chamber loop end
 //################# Tracker Track and Segments MC Truth Match #######################
 #ifdef TrackingParticles
-    //Match to Tracking Particle Collection
-    SavedTP.clear();
-    TrkParticles_pt->push_back(0);
-    TrkParticles_eta->push_back(0);
-    TrkParticles_phi->push_back(0);
-    TrkParticles_pdgId->push_back(0);
-    TrkParticles_charge->push_back(-100.0);
-    SharedHitsRatio->push_back(-100.0);
-    MCMatchChi2->push_back(-100.0);
-    TTTruthDChains->push_back(-2);
-    TTTruthMuType->push_back(0);
-    SegTruthDChains->push_back(-2);
-    SegTruthMuType->push_back(0);
-    if (IsMC) {
+    if (IsMC&&HasTrackingParticle) {
+      SavedTP.clear();
+      IsPUTrack->push_back(false);
+      TrkParticles_pt->push_back(0);
+      TrkParticles_eta->push_back(0);
+      TrkParticles_phi->push_back(0);
+      TrkParticles_pdgId->push_back(0);
+      TrkParticles_charge->push_back(-100.0);
+      SharedHitsRatio->push_back(-100.0);
+      MCMatchChi2->push_back(-100.0);
+      TTTruthDChains->push_back(-2);
+      TTTruthMuType->push_back(0);
+      SegTruthDChains->push_back(-2);
+      SegTruthMuType->push_back(0);
       NumMisMatch++;
       ChamberSimHits.clear();
       RefToBase<Track> trk(InnerTrack);
@@ -644,24 +638,20 @@ void MuonSysPriEff::beginRun(edm::Run const & iRun, edm::EventSetup const& iSetu
 
 //deadzone center is according to http://cmslxr.fnal.gov/lxr/source/RecoLocalMuon/CSCEfficiency/src/CSCEfficiency.cc#605
 //wire spacing is according to CSCTDR
-const Float_t deadZoneCenterME1_14[2] = {-81.0,81.0};
-const Float_t deadZoneCenterME1_2[4] = {-86.285,-32.88305,32.867423,88.205};
-const Float_t deadZoneCenterME1_3[4] = {-83.155,-22.7401,27.86665,81.005};
-const Float_t deadZoneCenterME2_1[4] = {-95.94,-27.47,33.67,93.72};
-const Float_t deadZoneCenterME3_1[4] = {-85.97,-36.21,23.68,84.04};
-const Float_t deadZoneCenterME4_1[4] = {-75.82,-26.14,23.85,73.91};
-const Float_t deadZoneCenterME234_2[6] = {-162.48,-81.8744,-21.18165,39.51105,100.2939,160.58};
+const Float_t deadZoneCenterME1_2[2] = {-32.88305,32.867423};
+const Float_t deadZoneCenterME1_3[2] = {-22.7401,27.86665};
+const Float_t deadZoneCenterME2_1[2] = {-27.47,33.67};
+const Float_t deadZoneCenterME3_1[2] = {-36.21,23.68};
+const Float_t deadZoneCenterME4_1[2] = {-26.14,23.85};
+const Float_t deadZoneCenterME234_2[4] = {-81.8744,-21.18165,39.51105,100.2939};
 Float_t MuonSysPriEff::YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing){
   const Float_t *deadZoneCenter;
   Float_t deadZoneHeightHalf=3.16*7./2.,minY=999999.;
-  Byte_t nGaps=4;
+  Byte_t nGaps=2;
   switch (abs(StationAndRing)) {
   case 11:
   case 14:
-    deadZoneCenter=deadZoneCenterME1_14;
-    deadZoneHeightHalf=2.5*7./2.;
-    nGaps=2;
-    break;
+    return minY;
   case 12:
     deadZoneCenter=deadZoneCenterME1_2;
     break;
@@ -682,7 +672,7 @@ Float_t MuonSysPriEff::YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing){
     break;
   default:
     deadZoneCenter=deadZoneCenterME234_2;
-    nGaps=6;
+    nGaps=4;
   }
   for ( Byte_t iGap=0;iGap<nGaps;iGap++ ) {
     Float_t newMinY=yLocal<deadZoneCenter[iGap]?deadZoneCenter[iGap]-deadZoneHeightHalf-yLocal:yLocal-(deadZoneCenter[iGap]+deadZoneHeightHalf);
@@ -740,7 +730,7 @@ MuonSysPriEff::MuonSysPriEff(const edm::ParameterSet& pset) {
   RunInfo_Tree->SetCircular(500000);//the max events in a single root file
 //#################### Build Branches #########################
   //General event information
-  Muons_Tree->Branch("Event_Info",&Info.RUN,"RUN/l:EVENT:LumiBlock:ORBIT:BunchCrossing:HLT_FirstRunNum");
+  Muons_Tree->Branch("Event_Info",&Info.RUN,"RUN/l:EVENT:LumiBlock:ORBIT:BunchCrossing");
   Muons_Tree->Branch("isRealData",&isRealData,"isRealData/O");
   Muons_Tree->Branch("isHLTTriggerred",&isHLTTriggerred,"isHLTTriggerred/O");
   Muons_Tree->Branch("isGoodVertex",&isGoodVertex,"isGoodVertex/O");
@@ -749,11 +739,15 @@ MuonSysPriEff::MuonSysPriEff(const edm::ParameterSet& pset) {
   numberOfPUVertices=0;
   Muons_Tree->Branch("numberOfPUVertices",&numberOfPUVertices,"numberOfPUVertices/I");
   //Muon Basic Information
-  MakeVecBranch("pt",pt,Float_t);  MakeVecBranch("eta",eta,Float_t);  MakeVecBranch("phi",phi,Float_t);
+  MakeVecBranch("pt",pt,Float_t); MakeVecBranch("ptError",ptError,Float_t); 
+  MakeVecBranch("eta",eta,Float_t); MakeVecBranch("etaError",etaError,Float_t);  
+  MakeVecBranch("phi",phi,Float_t); MakeVecBranch("phiError",phiError,Float_t);
   MakeVecBranch("chargeMinus",chargeMinus,Bool_t); MakeVecBranch("isGlobalMu",isGlobalMu,Bool_t);  MakeVecBranch("isTrackerMu",isTrackerMu,Bool_t);
   //Muon Vertex
   MakeVecBranch("Vertex_x",Vertex_x,Float_t);  MakeVecBranch("Vertex_y",Vertex_y,Float_t);  MakeVecBranch("Vertex_z",Vertex_z,Float_t);
-  MakeVecBranch("DXYwtBS",DXYwtBS,Float_t); MakeVecBranch("DXYwtPV",DXYwtPV,Float_t); MakeVecBranch("DXYErrwtPV",DXYErrwtPV,Float_t);
+  MakeVecBranch("DXYwtBS",DXYwtBS,Float_t);
+  MakeVecBranch("DZwtBS",DZwtBS,Float_t);
+  MakeVecBranch("DXYwtPV",DXYwtPV,Float_t); MakeVecBranch("DXYErrwtPV",DXYErrwtPV,Float_t);
   //Muon Isolation
   MakeVecBranch("isoR03sumPt",isoR03sumPt,Float_t);
   MakeVecBranch("isoR05sumPt",isoR05sumPt,Float_t);
@@ -827,7 +821,6 @@ MuonSysPriEff::MuonSysPriEff(const edm::ParameterSet& pset) {
   MakeVecBranch("Gen_pt",Gen_pt,Float_t);  MakeVecBranch("Gen_eta",Gen_eta,Float_t);  MakeVecBranch("Gen_phi",Gen_phi,Float_t);   MakeVecBranch("Gen_pdgId",Gen_pdgId,Int_t);
   MakeVecBranch("Gen_vx",Gen_vx,Float_t);  MakeVecBranch("Gen_vy",Gen_vy,Float_t);  MakeVecBranch("Gen_vz",Gen_vz,Float_t);  MakeVecBranch("Gen_vt",Gen_vt,Float_t);
   MakeVecBranch("IsParInHep",IsParInHep,Bool_t);
-  Muons_Tree->Branch("HepMCVertex",HepMCFourVec,"HepMCVertex[4]/F");
 
 #ifdef TrackingParticles  
   //Simulated Tracks
@@ -852,7 +845,7 @@ MuonSysPriEff::MuonSysPriEff(const edm::ParameterSet& pset) {
   HLTNamesSet = new vector<string>();
   RunInfo_Tree->Branch("HLTNamesSet",&HLTNamesSet);
   RunInfo_Tree->Branch("NumberOfEvents",&NumberOfEvents,"NumberOfEvents/l");
-  FirstEvent=true;IsMC=true;HasDigi=true;
+  FirstEvent=true;IsMC=true;HasDigi=true;HasTrackingParticle=true;
 }
 
 Muon::ArbitrationType MuonSysPriEff::MuonArbitrationTypeFromString( const std::string &label ) {
@@ -886,10 +879,13 @@ void MuonSysPriEff::ClearVecs_HepMC() {
 void MuonSysPriEff::ClearVecs_RECO() {
   //basic information
   pt->clear(); eta->clear();  phi->clear();
+  ptError->clear(); etaError->clear();  phiError->clear();
   chargeMinus->clear();  isGlobalMu->clear();  isTrackerMu->clear();
   //muon vertex
   Vertex_x->clear();  Vertex_y->clear();  Vertex_z->clear();
-  DXYwtBS->clear();  DXYwtPV->clear(); DXYErrwtPV->clear();
+  DXYwtBS->clear();
+  DZwtBS->clear();
+  DXYwtPV->clear(); DXYErrwtPV->clear();
   //isolation
   isoR03sumPt->clear();
   isoR05sumPt->clear();
@@ -974,11 +970,14 @@ MuonSysPriEff::~MuonSysPriEff() {
   delete Gen_vx; delete Gen_vy;  delete Gen_vz;  delete Gen_vt;
  //basic information
   delete pt; delete eta; delete  phi;
+  delete ptError; delete etaError; delete phiError;
   delete chargeMinus;
   delete  isGlobalMu; delete  isTrackerMu;
   //muon vertex
   delete Vertex_x; delete  Vertex_y; delete  Vertex_z;
-  delete DXYwtBS; delete  DXYwtPV; delete DXYErrwtPV;
+  delete DXYwtBS;
+  delete DZwtBS;
+  delete  DXYwtPV; delete DXYErrwtPV;
   //isolation
   delete isoR03sumPt;
   delete isoR05sumPt;
@@ -1085,8 +1084,6 @@ MuonSysPriEff::TheMuonType MuonSysPriEff::classification(vector<Int_t> &Chain)
       else return NoMuSysHit;
     }
     if (MuPos>=0&&ParType>=LightMeson&&ParType<=BottomBaryon) {
-      //float deltaRPhi2=((*Gen_vx)[MuPos]-HepMCFourVec[0])*((*Gen_vx)[MuPos]-HepMCFourVec[0])+((*Gen_vy)[MuPos]-HepMCFourVec[1])*((*Gen_vy)[MuPos]-HepMCFourVec[1]);
-      //float deltaZ=abs((*Gen_vz)[MuPos]-HepMCFourVec[2]);
       float deltaRPhi2=((*Gen_vx)[MuPos])*((*Gen_vx)[MuPos])+((*Gen_vy)[MuPos])*((*Gen_vy)[MuPos]);
       float deltaZ=abs((*Gen_vz)[MuPos]);
       if ( (*IsParInHep)[MuPos]||(deltaRPhi2<100&&deltaZ<30) ) {//inside pixel detector
