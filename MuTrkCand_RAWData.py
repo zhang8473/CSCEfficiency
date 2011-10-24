@@ -32,9 +32,9 @@ process.load("Configuration.StandardSequences.Services_cff")
 process.source = cms.Source('PoolSource',
 fileNames = cms.untracked.vstring(inputfiles)
 #,eventsToProcess = cms.untracked.VEventRange('1:24575813-1:24575813')
-#,skipEvents=cms.untracked.uint32(28)
+,skipEvents=cms.untracked.uint32(1500)
 )
-#process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10) )
 
 process.MuTrkCand = cms.EDAnalyzer('MuonSysPriEff',
                                   FileName = cms.string(outputfileName),
@@ -47,7 +47,6 @@ process.MuTrkCand = cms.EDAnalyzer('MuonSysPriEff',
                                   TriggerResultsTag = cms.InputTag('TriggerResults','',HLTProc),
                                   triggerEventTag = cms.untracked.InputTag('hltTriggerSummaryAOD','',HLTProc),
                                   HLTObj_HLTNames = cms.vstring("HLT_Mu5_v10"),
-                                  hltFilterNames = cms.VInputTag(cms.InputTag('hltSingleMu24L3Filtered24','',HLTProc)),
                                   StandardMuonCuts = cms.untracked.vstring("GlobalMuonPromptTight","TMLastStationLoose","TMLastStationTight","TMLastStationAngLoose","TMLastStationAngTight"),
                                   minTrackHits = cms.untracked.uint32(3)
 )
