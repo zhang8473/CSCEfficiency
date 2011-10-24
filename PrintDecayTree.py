@@ -5,15 +5,13 @@ process.load("FWCore.MessageService.MessageLogger_cfi")
 process.load("SimGeneral.HepPDTESSource.pythiapdt_cfi")
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(10)
+    input = cms.untracked.int32(1)
 )
 
 process.source = cms.Source('PoolSource',
-fileNames = cms.untracked.vstring("file:/home/zhangjin/CSCEffStudy/testCSCEff.root")
+fileNames = cms.untracked.vstring("file:~/MetaData/Test_QCD_Pt_300to470RECO.root"),
+skipEvents=cms.untracked.uint32(5)
 )
-#process.source = cms.Source('PoolSource',
-#fileNames = cms.untracked.vstring("file:/home/zhangjin/Test_CMSSW333_DYmumu_Mcut500_7TeV_n10_MC31XV9_RECO.root")
-#)
 
 process.printTree = cms.EDAnalyzer("ParticleTreeDrawer",
     src = cms.InputTag("genParticles"),
@@ -35,7 +33,7 @@ process.printList = cms.EDAnalyzer("ParticleListDrawer",
 
 process.printEventNumber = cms.OutputModule("AsciiOutputModule")
 
-#process.p1 = cms.Path(process.printTree)
+process.p1 = cms.Path(process.printTree)
 process.p2 = cms.Path(process.printList)
 
 process.outpath = cms.EndPath(process.printEventNumber)
