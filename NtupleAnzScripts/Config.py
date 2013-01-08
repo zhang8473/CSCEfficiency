@@ -37,6 +37,7 @@ TemporaryOutputFile="/tmp/Tmp_AddedBranchTree.root"#New branches will be added t
 DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCyErrProjLc# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# ) "#default
 ProbeSegment="( CSCDrTTSeg#<40. && CSCDrTTSeg#>0.)"#default
 ProbeLCT="( CSCDrTTLCT#<40. && CSCDrTTLCT#>0. )"#default
+#DenominatorRequire="( run_number==202012 && LumiBlock=?? ) &&"+DenominatorRequire #require a certain run and lumi sec?
 
 #DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 ) "#old one
 #DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCyErrProjLc# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# ) "# for calculating systematic: close-by muons
