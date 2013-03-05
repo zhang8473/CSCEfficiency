@@ -5,7 +5,7 @@
 #
 # Import the right stuff
 #
-datatype = "GEN-SIM"
+datatype = "RAW"
 #Candidates are data: "RAW" "RAW-RECO" "FEVT"
 #mc: in order of suggestions: "GEN-RAWDEBUG"(mc) "GEN-SIM-RAW"(mc) "GEN-RAW"(mc) "GEN-SIM".....
 # if no RAW exists, you need to choose a mixing module manually
@@ -149,7 +149,7 @@ process.source = cms.Source("PoolSource",
                             #fileNames = cms.untracked.vstring("dcap:://pnfs/cms/WAX/11/store/mc/Summer12/DYToMuMu_M_20_TuneZ2star_8TeV_pythia6/GEN-SIM/START50_V13-v1/0000/001E08EA-EC56-E111-A0C6-002618943915.root")#/DYToMuMu_M-20_CT10_TuneZ2star_8TeV-powheg-pythia6/Summer12-START50_V13-v1/GEN-SIM
                             #fileNames = cms.untracked.vstring("dcap:://pnfs/cms/WAX/11/store/mc/Summer12/WJetsToLNu_TuneZ2Star_8TeV-madgraph-tarball/GEN-SIM/START52_V9-v3/0008/FEF6E3F9-FCD3-E111-8322-0025901D0C52.root")#/WJetsToLNu_TuneZ2Star_8TeV-madgraph-tarball/Summer12-START52_V9-v3/GEN-SIM
                             #fileNames = cms.untracked.vstring("dcap:://pnfs/cms/WAX/11/store/mc/Summer12/JPsiToMuMu_2MuPtEtaFilter_tuneD6T_8TeV-pythia6-evtgen/GEN-SIM/START52_V9-v3/0001/FEDFAB36-3BF8-E111-9DF6-68B599B94F60.root")#/JPsiToMuMu_2MuPtEtaFilter_tuneD6T_8TeV-pythia6-evtgen/Summer12-START52_V9-v3/GEN-SIM
-                            fileNames = cms.untracked.vstring("/tmp//store/mc/Summer12/JPsiToMuMu_2MuPtEtaFilter_tuneD6T_8TeV-pythia6-evtgen/GEN-SIM/START50_V13-v1/0000/DAA59CAF-1077-E111-B486-0015172C03DF.root")#/SingleMu/Run2012C-v1/RAW
+                            fileNames = cms.untracked.vstring("dcap://cmsdca.fnal.gov:24137/pnfs/fnal.gov/usr/cms/WAX/11/store/data/Run2012C/SingleMu/RAW/v1/000/202/016/98D875A0-10F3-E111-B2F2-001D09F2AD84.root")#/SingleMu/Run2012C-v1/RAW
                             ,skipEvents=cms.untracked.uint32(0)
 )
 #
@@ -167,10 +167,12 @@ process.options = cms.untracked.PSet(
 from RecoMuon.TrackingTools.MuonSegmentMatcher_cff import *
 process.load("TrackingTools.TrackAssociator.DetIdAssociatorESProducer_cff") 
 from TrackingTools.TrackAssociator.default_cfi import *
+from RecoMuon.MuonIsolationProducers.trackExtractorBlocks_cff import MIsoTrackExtractorBlock
 
 process.aodDump = cms.EDAnalyzer('TPTrackMuonSys',
                                  TrackAssociatorParameterBlock,
                                  MuonSegmentMatcher,
+                                 TrackExtractor=cms.PSet(MIsoTrackExtractorBlock),
                                  rootFileName   = cms.untracked.string('CSCPFG_Ineff_DATA.root'),
                                  CSCUseTimingCorrections = cms.bool( True ),
                                  CSCUseGasGainCorrections = cms.bool( True ),

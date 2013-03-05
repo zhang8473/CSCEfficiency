@@ -81,7 +81,8 @@
 #include "DataFormats/TrackReco/interface/Track.h"  // reconstructed tracks that are stored in the AOD and RECO.
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
 #include "DataFormats/TrackReco/interface/DeDxData.h"
-
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractor.h"//isolation
+#include "PhysicsTools/IsolationAlgos/interface/IsoDepositExtractorFactory.h"
 //Track-detector associator
 #include "TrackingTools/TrackAssociator/interface/TrackDetectorAssociator.h"
 
@@ -222,7 +223,9 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   void getCSCSegWkeyHalfStrip(const std::vector<CSCRecHit2D> &theseRecHits, Float_t &cStrp, Float_t &ckWG);
   
   Float_t YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing);
-  
+
+  vector<Float_t> GetEdgeAndDistToGap(reco::TrackRef trackRef, CSCDetId & detid);
+
   reco::MuonCollection::const_iterator matchTTwithMT(reco::TrackCollection::const_iterator &itrack);
 
   bool matchTTwithCSCRecHit(bool trackDir,
@@ -290,7 +293,7 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   // Extrapolator to cylinder
   edm::ESHandle<Propagator> propagatorAlong;
   edm::ESHandle<Propagator> propagatorOpposite;
-
+  edm::ParameterSet trackExtractorPSet_;
   // counters
   Int_t nEventsAnalyzed;
   Int_t treeCount;
@@ -371,6 +374,7 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Float_t tracks_eta, tracks_phi, tracks_dxy, tracks_d0, tracks_dsz, tracks_dz;
   Float_t tracks_vx, tracks_vy, tracks_vz, tracks_ndof;
   Float_t tracks_qoverp, tracks_lambda, tracks_quality;
+  Float_t tracks_IsoR03Ratio,tracks_IsoR05Ratio;//ratio of track pT
   Float_t tracks_qoverpError, tracks_ptError, tracks_thetaError, tracks_lambdaError;
   Float_t tracks_etaError, tracks_phiError, tracks_dxyError, tracks_d0Error , tracks_dszError;
   Float_t tracks_dzError;
@@ -395,9 +399,10 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Float_t lctPhiDiff2, lctEtaDiff2, lctDelHStrp2, lctDelWkey2; 
 
   Float_t MuTagPx, MuTagPy, MuTagPz, MuProbePx, MuProbePy, MuProbePz;
-  Int_t MuTagcharge, MuTagHitsMuSys, MuTagHitsTrkSys, MuTagHitsPixSys, MuTagHitsRPCSys;
+  Int_t MuTagHitsMuSys, MuTagHitsTrkSys;
   Float_t MuTagE, MuProbeE;
-  Float_t MuTagPhiProj1, MuTagEtaProj1, MuTagPhiProj2, MuTagEtaProj2; 
+  Float_t MuTagPhiProj1, MuTagEtaProj1, MuTagPhiProj2, MuTagEtaProj2;
+  Float_t MuTagIsoR03Ratio,MuTagIsoR05Ratio;//ratio of muon pT
   Float_t MuTagtracktruth_pt, MuTagtracktruth_p, MuTagtracktruth_id;
   Bool_t MuTagtracktruth_isPileup;
   ULong64_t MuTagtracktruth_type;
@@ -407,7 +412,7 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   //
   Bool_t MuTagCaloL, MuTagCaloT, iSameVtx;
 
-  Int_t mu_found, MuProbenHitsMuSys, MuProbenHitsTrkSys, MuProbenHitsPixSys, MuProbenHitsRPCSys;
+  Int_t mu_found, MuProbenHitsMuSys, MuProbenHitsTrkSys, MuProbenHitsPixSys;
   Int_t MuTagPromt, MuTagnSegTrkArb, MuProbeCharge;
   Float_t MuProbePt, MuProbeEta, MuProbePhi, MuTagPt, MuTagEta, MuTagPhi, invMass, deltaRTrkMu;      
   Float_t vtx_r, vtx_z, vtx_rError, vtx_zError, vtx_normChi2;
@@ -420,28 +425,25 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Bool_t CSCChBad[4];
   
   /*Extrapolated Tracks on CSC Chamber Candidates in each station*/
-  Float_t CSCxProjLc[4],CSCyProjLc[4],CSCxErrProjLc[4],CSCyErrProjLc[4],CSCDyProjHVGap[4],CSCProjEdgeDist[4],CSCProjEdgeDistErr[4];
+  Float_t CSCDyProjHVGap[4],CSCDyErrProjHVGap[4],CSCProjEdgeDist[4],CSCProjEdgeDistErr[4];//note: there is no so-called extrapolated track position on CSC chambers, because you need to know which layer.
   
   /*Segments characteristics*/
-  Float_t CSCSegxLc[4],CSCSegyLc[4],CSCSegxErrLc[4],CSCSegyErrLc[4],CSCSegChisqProb[4];
+  Float_t CSCSegxLc[4],CSCSegyLc[4],CSCSegxErrLc[4],CSCSegyErrLc[4],CSCSegChisqProb[4],CSCdXdZTTSeg[4],CSCdYdZTTSeg[4];
   Int_t CSCnSegHits[4];
 
   /*Distance from the Extrapolated Tracks to CSC Segments, 99999. for no CSC segment found*/
-  Float_t CSCDxyTTSeg[4],CSCDxTTSeg[4],CSCDyTTSeg[4],CSCDxyErrTTSeg[4],CSCdXdZTTSeg[4],CSCdYdZTTSeg[4];
+  Float_t CSCDxyTTSeg[4],CSCDxTTSeg[4],CSCDyTTSeg[4],CSCDxyErrTTSeg[4];
+
+  /*LCT characteristics*/
+  Float_t CSCLCTxLc[4],CSCLCTyLc[4];
+  Int_t CSCLCTbx[4];
 
   /*Distance from the Extrapolated Tracks to LCT, 99999. for no LCT found*/
-  Float_t CSCLCTxLc[4],CSCLCTyLc[4],CSCDrTTLCT[4],CSCDrErrTTLCT[4];
-  Int_t CSCLCTbx[4];
+  Float_t CSCDxyTTLCT[4],CSCDxTTLCT[4],CSCDyTTLCT[4],CSCDxyErrTTLCT[4];
 
   /*DetlaR between the extrapolated tracker track on muon system and the tagged muon*/
   Float_t dRTkMu[4];  
   /*Default decision of whether a segment or LCT is found*/
   Int_t segSt[4],lctSt[4];
-
-  Int_t errPos, chargeQ1, chargeQ2, chargeQ3; 
-  Int_t mREndcap, mRStation, mRRing, mRChamber, rME11;
-  Int_t diffPattern;
-  Float_t mRCSCLCTDx, mRCSCLCTDy, mRCSCLCTDr, segDXDZ, segDYDZ;
-
 };
 #endif

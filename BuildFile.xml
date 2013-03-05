@@ -28,5 +28,6 @@
 <use   name="TrackingTools/TransientTrack"/>
 <use   name="TrackingTools/Records"/>
 <use   name="TrackingTools/TrackAssociator"/>
+<use   name="PhysicsTools/IsolationAlgos"/>
 <use   name="rootminuit"/>
 <flags   EDM_PLUGIN="1"/>
