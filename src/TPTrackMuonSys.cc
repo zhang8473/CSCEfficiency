@@ -46,6 +46,7 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
 
   // TrackAssociator parameters
   edm::ParameterSet parameters = Conf.getParameter<edm::ParameterSet>("TrackAssociatorParameters");
+  trackExtractorPSet_ = Conf.getParameter<edm::ParameterSet>("TrackExtractor");
   parameters_.loadParameters( parameters );
   trackAssociator_.useDefaultPropagator();
 
@@ -113,6 +114,8 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
   fractNtuple->Branch("MuTagPt",         &MuTagPt,         "MuTagPt/F") ;
   fractNtuple->Branch("MuTagEta",        &MuTagEta,        "MuTagEta/F") ;
   fractNtuple->Branch("MuTagPhi",        &MuTagPhi,        "MuTagPhi/F") ;
+  fractNtuple->Branch("MuTagIsoR03Ratio",        &MuTagIsoR03Ratio,        "MuTagIsoR03Ratio/F") ;
+  fractNtuple->Branch("MuTagIsoR05Ratio",        &MuTagIsoR05Ratio,        "MuTagIsoR05Ratio/F") ;
   fractNtuple->Branch("MuTagPromt",      &MuTagPromt,      "MuTagPromt/I");
   fractNtuple->Branch("MuTagnSegTrkArb", &MuTagnSegTrkArb, "MuTagnSegTrkArb/I");
   fractNtuple->Branch("MuTagCaloL",      &MuTagCaloL,      "MuTagCaloL/O") ;
@@ -143,6 +146,8 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
   fractNtuple->Branch("tracks_vx",        &tracks_vx,        "tracks_vx/F");
   fractNtuple->Branch("tracks_vy",        &tracks_vy,        "tracks_vy/F");
   fractNtuple->Branch("tracks_vz",        &tracks_vz,        "tracks_vz/F");
+  fractNtuple->Branch("tracks_IsoR03Ratio",        &tracks_IsoR03Ratio,        "tracks_IsoR03Ratio/F");
+  fractNtuple->Branch("tracks_IsoR05Ratio",        &tracks_IsoR05Ratio,        "tracks_IsoR05Ratio/F");
   fractNtuple->Branch("tracks_qoverp",    &tracks_qoverp,    "tracks_qoverp/F");
   fractNtuple->Branch("tracks_lambda",    &tracks_lambda,    "tracks_lambda/F");
   fractNtuple->Branch("tracks_recHitsSize", &tracks_recHitsSize,   "tracks_recHitsSize/I");
@@ -186,37 +191,38 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
     MakeBranchAllSt("CSCCBad","O",CSCChBad);
 
     /*Extrapolated Tracks on CSC Chamber Candidates in each station*/
-    MakeBranchAllSt("CSCxProjLc","F",CSCxProjLc);
-    MakeBranchAllSt("CSCyProjLc","F",CSCyProjLc);
-    MakeBranchAllSt("CSCxErrProjLc","F",CSCxErrProjLc);
-    MakeBranchAllSt("CSCyErrProjLc","F",CSCyErrProjLc);
     MakeBranchAllSt("CSCDyProjHVGap","F",CSCDyProjHVGap);
+    MakeBranchAllSt("CSCDyErrProjHVGap","F",CSCDyErrProjHVGap);
     MakeBranchAllSt("CSCProjDistEdge","F",CSCProjEdgeDist);
     MakeBranchAllSt("CSCProjDistErrEdge","F",CSCProjEdgeDistErr);
  
-    /*Distance from the Extrapolated Tracks to CSC Segments, 99999. for no CSC segment found*/ 
-    MakeBranchAllSt("CSCDrTTSeg","F",CSCDxyTTSeg);
-    MakeBranchAllSt("CSCDxTTSeg","F",CSCDxTTSeg);
-    MakeBranchAllSt("CSCDyTTSeg","F",CSCDyTTSeg);
-    MakeBranchAllSt("CSCDrErrTTSeg","F",CSCDxyErrTTSeg) ;
-    MakeBranchAllSt("CSCdXdZTTSeg","F",CSCdXdZTTSeg);
-    MakeBranchAllSt("CSCdYdZTTSeg","F",CSCdYdZTTSeg);
-
     /*Segments characteristics*/
     MakeBranchAllSt("CSCSegxLc","F",CSCSegxLc);
     MakeBranchAllSt("CSCSegyLc","F",CSCSegyLc);
     MakeBranchAllSt("CSCSegxErrLc","F",CSCSegxErrLc);
     MakeBranchAllSt("CSCSegyErrLc","F",CSCSegyErrLc);
+    MakeBranchAllSt("CSCdXdZTTSeg","F",CSCdXdZTTSeg);
+    MakeBranchAllSt("CSCdYdZTTSeg","F",CSCdYdZTTSeg);
     MakeBranchAllSt("CSCSegChisqProb","F",CSCSegChisqProb);
     MakeBranchAllSt("CSCnSegHits","I",CSCnSegHits) ;
 
-    /*Distance from the Extrapolated Tracks to LCT, 99999. for no LCT found*/
+    /*Distance from the Extrapolated Tracks to CSC Segments, 99999. for no CSC segment found*/ 
+    MakeBranchAllSt("CSCDxyTTSeg","F",CSCDxyTTSeg);
+    MakeBranchAllSt("CSCDxTTSeg","F",CSCDxTTSeg);
+    MakeBranchAllSt("CSCDyTTSeg","F",CSCDyTTSeg);
+    MakeBranchAllSt("CSCDxyErrTTSeg","F",CSCDxyErrTTSeg) ;
+
+    /*LCT characteristics*/
     MakeBranchAllSt("CSCLCTxLc","F",CSCLCTxLc);
     MakeBranchAllSt("CSCLCTyLc","F",CSCLCTyLc);
-    MakeBranchAllSt("CSCDrTTLCT","F",CSCDrTTLCT);
-    MakeBranchAllSt("CSCDrErrTTLCT","F",CSCDrErrTTLCT);
     MakeBranchAllSt("CSCLCTbx","I",CSCLCTbx);
-    
+
+    /*Distance from the Extrapolated Tracks to LCT, 99999. for no LCT found*/
+    MakeBranchAllSt("CSCDxyTTLCT","F",CSCDxyTTLCT);
+    MakeBranchAllSt("CSCDxTTLCT","F",CSCDxTTLCT);
+    MakeBranchAllSt("CSCDyTTLCT","F",CSCDyTTLCT);
+    MakeBranchAllSt("CSCDxyErrTTLCT","F",CSCDxyErrTTLCT);
+
     /*DetlaR between the extrapolated tracker track on muon system and the tagged muon*/
     MakeBranchAllSt("dRTkMu","F",dRTkMu);
 
@@ -578,6 +584,8 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
     }
   }//end of first track loop
 
+  std::string trackExtractorName = trackExtractorPSet_.getParameter<std::string>("ComponentName");
+  reco::isodeposit::IsoDepositExtractor* muIsoExtractorTrack_ = IsoDepositExtractorFactory::get()->create( trackExtractorName, trackExtractorPSet_);
   for (reco::MuonCollection::const_iterator muIter1 = muons->begin(); muIter1 != muons->end(); ++muIter1) {  
     if (!muIter1->isTrackerMuon() ) continue;
     if(!muIter1->track().isNonnull()) continue;
@@ -609,10 +617,10 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
     MuTagEta    = muIter1->track()->eta() ;
     MuTagPhi    = muIter1->track()->phi() ;
 
-    MuTagcharge = muIter1->track()->charge() ;
+    Int_t MuTagcharge = muIter1->track()->charge() ;
 
-    MuTagHitsPixSys  = muIter1->track()->hitPattern().numberOfValidPixelHits();
-    MuTagHitsRPCSys  = muIter1->track()->hitPattern().numberOfValidMuonRPCHits();
+    //    MuTagHitsPixSys  = muIter1->track()->hitPattern().numberOfValidPixelHits();
+    //    MuTagHitsRPCSys  = muIter1->track()->hitPattern().numberOfValidMuonRPCHits();
 
     /// check for HLT matching
     minDRHLTDiMu=100.; minDRHLTAllSingleMu=100.;
@@ -655,7 +663,8 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	}//end of loop ki
       }//end of loop ia
     }//end of if m_GotTrgObj
-
+    MuTagIsoR03Ratio = MuTagPt>0?muIter1->isolationR03().sumPt/MuTagPt:9999.;
+    MuTagIsoR05Ratio = MuTagPt>0?muIter1->isolationR05().sumPt/MuTagPt:9999.;
     MuTagCaloL= muon::isGoodMuon(*muIter1,muon::TM2DCompatibilityLoose);
     MuTagCaloT= muon::isGoodMuon(*muIter1,muon::TM2DCompatibilityTight);
      
@@ -772,6 +781,9 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
       tracks_vx     = itTrack->vx();  // x coordinate of the reference point on track
       tracks_vy     = itTrack->vy();  // y coordinate of the reference point on track
       tracks_vz     = itTrack->vz();  // z coordinate of the reference point on track
+      reco::IsoDeposit depTrk = muIsoExtractorTrack_->deposit(event, setup, *itTrack );
+      tracks_IsoR03Ratio = tracks_pt>0?depTrk.depositWithin(0.3)/tracks_pt:9999.;
+      tracks_IsoR05Ratio = tracks_pt>0?depTrk.depositWithin(0.5)/tracks_pt:9999.;
       tracks_qoverp = itTrack->qoverp(); // q/p 
       tracks_lambda = itTrack->lambda();
       tracks_recHitsSize= itTrack->recHitsSize();
@@ -894,11 +906,8 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	CSCChCand[j]=-9999;
  	CSCChBad[j] = false;
 	/*Extrapolated Tracks on CSC Chamber Candidates in each station*/
-	CSCxProjLc[j]=-9999.;
-	CSCyProjLc[j]=-9999.;
-	CSCxErrProjLc[j]=-9999.;
-	CSCyErrProjLc[j]=-9999.;
-	CSCDyProjHVGap[j]=-9999.;
+	CSCDyProjHVGap[j]=9999.;
+	CSCDyErrProjHVGap[j]=-9999.;
 	CSCProjEdgeDist[j]=-9999.;
 	CSCProjEdgeDistErr[j]=-9999.;
 	/*Segments characteristics*/
@@ -907,20 +916,23 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	CSCSegxErrLc[j]=-9999.;
 	CSCSegyErrLc[j]=-9999.;
  	CSCSegChisqProb[j]=-9999.;
+	CSCdXdZTTSeg[j]=-9999.;
+	CSCdYdZTTSeg[j]=-9999.;
 	CSCnSegHits[j]=-9999;
 	/*Distance from the Extrapolated Tracks to CSC Segments, 9999. for no CSC segment found*/ 
 	CSCDxyTTSeg[j]=-9999.;
 	CSCDxTTSeg[j]=-9999.;
 	CSCDyTTSeg[j]=-9999.;
 	CSCDxyErrTTSeg[j]=-9999.;
-	CSCdXdZTTSeg[j]=-9999.;
-	CSCdYdZTTSeg[j]=-9999.;
-	/*Distance from the Extrapolated Tracks to LCT, 9999. for no LCT found*/
+	/*LCT characteristics*/
 	CSCLCTxLc[j] = -9999.;
 	CSCLCTyLc[j] = -9999.;
-	CSCDrTTLCT[j] = -9999.;
-	CSCDrErrTTLCT[j] = -9999.;
 	CSCLCTbx[j] = -9999;
+	/*Distance from the Extrapolated Tracks to LCT, 9999. for no LCT found*/
+	CSCDxyTTLCT[j] = -9999.;
+	CSCDxTTLCT[j] = -9999.;
+	CSCDyTTLCT[j] = -9999.;
+	CSCDxyErrTTLCT[j] = -9999.;
 	/*DetlaR between the extrapolated tracker track on muon system and the tagged muon*/
 	dRTkMu[j] = -9999.;
 	/*Default decision of whether a segment or LCT is found*/
@@ -956,77 +968,46 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 
 	trkEta = tsos.globalPosition().eta(); trkPhi =  tsos.globalPosition().phi();
 	if(trkPhi  < 0) trkPhi += 2*M_PI;
-
-	CSCRg[st] = ringCandidate(st+1, trkEta, trkPhi);
-	if ( CSCRg[st]==0 ) continue;
-	CSCChCand[st] = thisChamberCandidate(st+1, CSCRg[st], trkPhi);
-	CSCDetId myid  = CSCDetId( ec, st+1, rg,  CSCChCand[st], 0 );
-	CSCChBad[st] = badChambers_->isInBadChamber(myid);
-	const GeomDet* gdet=cscGeom->idToDet(myid);
-	const CSCChamber* cscch = cscGeom->chamber(myid);
-	tsos=surfExtrapTrkSam(trackRef, gdet->surface().position().z());//update tsos with chamber Z position in database
-	if (!tsos.isValid()) continue;
-
 	/*dR between muon and track*/
 	Float_t MPhi = phiMuVec[st];
 	if(MPhi < 0 ) MPhi +=  2*M_PI;
 	Float_t TPhi = tsos.globalPosition().phi();
 	if(TPhi < 0 ) TPhi += 2*M_PI;
 	dRTkMu[st] = deltaR( etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi);
-	//	printf("Mu(%f,%f),Trk(%f,%f)-->dR(%f)",etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi,dRTkMu[st]);
-	
+//	printf("Mu(%f,%f),Trk(%f,%f)-->dR(%f)",etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi,dRTkMu[st]);
+
+	CSCRg[st] = ringCandidate(st+1, trkEta, trkPhi);
+	if ( CSCRg[st]==0 ) continue;
+
+	CSCChCand[st] = thisChamberCandidate(st+1, CSCRg[st], trkPhi);
+	CSCDetId Layer0Id=CSCDetId(ec, st+1, rg,  CSCChCand[st], 0);//layer 0 is the mid point of the chamber. It is not a real layer.
+	CSCChBad[st] = badChambers_->isInBadChamber( Layer0Id );
 #ifdef jz_debug
 	if (CSCChBad[st]) cerr<<(CSCEndCapPlus?"ME+":"ME-")<<st+1<<"/"<<CSCRg[st]<<"/"<<CSCChBad[st]<<" is a dead chamber."<<endl;
 #endif
-	LocalPoint localTTPos = gdet->surface().toLocal(tsos.freeState()->position());
-	const CSCChamberSpecs* chamberSpecs = cscch->specs();
-
-	const CSCLayerGeometry* layerGeometry = chamberSpecs->oddLayerGeometry(1);
-	const CSCWireTopology* wireTopology = layerGeometry->wireTopology();
-	Float_t wideWidth      = wireTopology->wideWidthOfPlane();
-	Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
-	Float_t length         = wireTopology->lengthOfPlane();
-	// If slanted, there is no y offset between local origin and symmetry center of wire plane
-	Float_t yOfFirstWire   = fabs(wireTopology->wireAngle())>1.E-06 ? -0.5*length : wireTopology->yOfWire(1);
-	// y offset between local origin and symmetry center of wire plane
-	Float_t yCOWPOffset    = yOfFirstWire+0.5*length;
-	   
-	// tangent of the incline angle from inside the trapezoid
-	Float_t tangent = (wideWidth-narrowWidth)/(2.*length);
-	// y position wrt bottom of trapezoid
-	Float_t yPrime  = localTTPos.y()+fabs(yOfFirstWire);
-	// half trapezoid width at y' is 0.5 * narrowWidth + x side of triangle with the above tangent and side y'
-	Float_t halfWidthAtYPrime = 0.5*narrowWidth+yPrime*tangent;
-	Float_t edgex = fabs(localTTPos.x()) - halfWidthAtYPrime;
-	Float_t edgey = fabs(localTTPos.y()-yCOWPOffset) - 0.5*length;
-
-	CSCxProjLc[st] = localTTPos.x();
- 	CSCyProjLc[st] = localTTPos.y();
-	CSCDyProjHVGap[st]=YDistToHVDeadZone(CSCyProjLc[st], (st+1)*10+CSCRg[st]);
-
-	//CSCxErrProjLc[st] = sqrt(tsos.cartesianError().position().cxx()); 
-	//CSCyErrProjLc[st] = sqrt(tsos.cartesianError().position().cyy());
-	LocalError localTTErr=tsos.localError().positionError();
-	CSCxErrProjLc[st] = sqrt( localTTErr.xx() ); 
-	CSCyErrProjLc[st] = sqrt( localTTErr.yy() );
-
-	if ( edgex > edgey ) {
-	  CSCProjEdgeDist[st] = edgex;
-	  CSCProjEdgeDistErr[st] = CSCxErrProjLc[st];
+	for (Int_t ly=1;ly<7;ly++) {
+	  CSCDetId ID  = CSCDetId( ec, st+1, rg,  CSCChCand[st], ly );
+	  vector<Float_t> EdgeAndDistToGap( GetEdgeAndDistToGap(trackRef,ID) );//values: 1-edge;2-err of edge;3-disttogap;4-err of dist to gap
+	  if (EdgeAndDistToGap[0]>CSCProjEdgeDist[st]) {
+	    CSCProjEdgeDist[st]=EdgeAndDistToGap[0];
+	    CSCProjEdgeDistErr[st]=EdgeAndDistToGap[1];
+	  }
+	  if (EdgeAndDistToGap[2]<CSCDyProjHVGap[st]) {
+	    CSCDyProjHVGap[st]=EdgeAndDistToGap[2];
+	    CSCDyErrProjHVGap[st]=EdgeAndDistToGap[3];
+	  }
 	}
-	else {
-	  CSCProjEdgeDist[st] = edgey;
-	  CSCProjEdgeDistErr[st] = CSCyErrProjLc[st];
-	}
-
-	/// Check the CSC segments in that region..
-	/// Get the matched CSC segment..
-	//cerr<<"CSCxProjLc: "<<tsos.localPosition().x()<<","<<CSCxProjLc[st]<<"+-"<<CSCxErrProjLc[st]<<endl;
-	//cerr<<"CSCyProjLc: "<<tsos.localPosition().y()<<","<<CSCyProjLc[st]<<"+-"<<CSCyErrProjLc[st]<<endl;
+	//cerr<<"To Edge:"<<CSCProjEdgeDist[st]<<"; To HVGap:"<<CSCDyProjHVGap[st]<<endl;
+	// Check the CSC segments in that region..
 	CSCSegmentCollection::const_iterator cscSegOut;
-	TrajectoryStateOnSurface *TrajToSeg = matchTTwithCSCSeg( trackRef, cscSegments,  cscSegOut, myid);//check tsos with segment Z position
-
+	TrajectoryStateOnSurface *TrajToSeg = matchTTwithCSCSeg( trackRef, cscSegments,  cscSegOut, Layer0Id);//update tsos with segment Z position, the segment z has little difference with layer 0 Z after the second or the third decimal place (in cm).
 	if ( TrajToSeg!=NULL ) {
+	  /*
+	  const GeomDet* tmp_gdet=cscGeom->idToDet(cscSegOut->cscDetId());
+	  const CSCChamber* cscchamber = cscGeom->chamber(cscSegOut->cscDetId());
+	  cerr<<"CSCSEGDetID:"<<cscSegOut->cscDetId()<<" -- posZ: "<<tmp_gdet->surface().position().z()
+	      <<" -- CSCSeg posZ: "<< cscchamber->toGlobal(cscSegOut->localPosition()).z()<<endl;
+	  */
 	  /* Save the chamber ID */
 	  CSCDetId id  = (CSCDetId) cscSegOut->cscDetId();
 	  /* Save the segment postion and direction */
@@ -1050,7 +1031,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	  LocalPoint localpCSC = gdet->surface().toLocal(TrajToSeg->freeState()->position());
 	  CSCDxTTSeg[st] = CSCSegxLc[st] - localpCSC.x(); 
 	  CSCDyTTSeg[st] = CSCSegyLc[st] - localpCSC.y(); 
-	  CSCDxyTTSeg[st] = sqrt(pow(CSCDxTTSeg[st],2)+pow(CSCDxTTSeg[st],2));
+	  CSCDxyTTSeg[st] = sqrt(pow(CSCDxTTSeg[st],2)+pow(CSCDyTTSeg[st],2));
 
 	  LocalError localTTErr =TrajToSeg->localError().positionError();
 	  Float_t CSCdeltaXErr2 = localSegErr.xx() + localTTErr.xx();
@@ -1070,18 +1051,30 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	  }
 	  nTrkCountCSCSeg++;
 	}
+
        	////// Loop over MPC infromation to look for LCTs....
-	LocalPoint *LCTPos=matchTTwithLCTs( CSCxProjLc[st], CSCyProjLc[st], CSCEndCapPlus?1:2, st+1, CSCRg[st], CSCChCand[st], mpclcts, CSCDrTTLCT[st], CSCLCTbx[st]);
-	if (LCTPos!=NULL) {
-	  CSCLCTxLc[st]=LCTPos->x();
-	  CSCLCTyLc[st]=LCTPos->y();
-	  //cout << "(x,y)=("<<CSCLCTxLc[st]<<","<< CSCLCTyLc[st] <<")"<< endl;
-	  CSCDrErrTTLCT[st] =sqrt(pow(CSCLCTxLc[st]-CSCxProjLc[st],2)*CSCxErrProjLc[st]*CSCxErrProjLc[st] + pow(CSCLCTyLc[st]-CSCyProjLc[st],2)*CSCyErrProjLc[st]*CSCyErrProjLc[st])/CSCDrTTLCT[st];
+	CSCDetId Layer3id  = CSCDetId( ec, st+1, rg,  CSCChCand[st], 3 );//go to layer 3 where corresponds to the LCTPos
+	const GeomDet* Layer3gdet=cscGeom->idToDet(Layer3id);
+	tsos=surfExtrapTrkSam(trackRef, Layer3gdet->surface().position().z());
+	if (tsos.isValid()) {
+	  LocalPoint localL3pCSC = Layer3gdet->surface().toLocal(tsos.freeState()->position());
+	  //cerr<<"TTLCTx,TTLCTy,TTLCTxy:"<<CSCDxTTLCT[st]<<","<<CSCDyTTLCT[st]<<","<<CSCDxyTTLCT[st]<<endl;
+	  //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
+	  LocalPoint *LCTPos=matchTTwithLCTs( localL3pCSC.x(), localL3pCSC.y(), CSCEndCapPlus?1:2, st+1, CSCRg[st], CSCChCand[st], mpclcts, CSCDxyTTLCT[st], CSCLCTbx[st]);
+	  if (LCTPos!=NULL) {
+	    CSCLCTxLc[st]=LCTPos->x();
+	    CSCLCTyLc[st]=LCTPos->y();
+	    CSCDxTTLCT[st]=CSCLCTxLc[st]-localL3pCSC.x();
+	    CSCDyTTLCT[st]=CSCLCTyLc[st]-localL3pCSC.y();
+	    CSCDxyTTLCT[st] = sqrt(pow(CSCDxTTLCT[st],2)+pow(CSCDyTTLCT[st],2));
+	    LocalError localTTErr =tsos.localError().positionError();
+	    CSCDxyErrTTLCT[st] =sqrt(pow(CSCDxTTLCT[st],2)*localTTErr.xx() + pow(CSCDyTTLCT[st],2)*localTTErr.yy())/CSCDxyTTLCT[st];
+	  }
 	}
       } // for loop for the stations -- j
       /*
       for (Byte_t st=0;st<4;st++) {
-	lctSt[st] = ( CSCDrTTLCT[st] >0. && CSCDrTTLCT[st] < 40 )?1:0;
+	lctSt[st] = ( CSCDxyTTLCT[st] >0. && CSCDxyTTLCT[st] < 40 )?1:0;
 	segSt[st] = ( CSCDxyTTSeg[st] >0. && CSCDxyTTSeg[st] < 40)?1:0;
 	}*/
       fractNtuple->Fill();
@@ -1261,6 +1254,48 @@ void TPTrackMuonSys::beginRun(const Run& r, const EventSetup& iSet)
     LogWarning("DataLost") << " HLT config extraction failure with process name " <<m_hlt.process();
     // In this case, all access methods will return empty values!
   }
+}
+
+vector<Float_t> TPTrackMuonSys::GetEdgeAndDistToGap(reco::TrackRef trackRef, CSCDetId & detid) {
+  vector<Float_t> result(4,9999.);
+  result[3]=-9999;
+  const GeomDet* gdet=cscGeom->idToDet( detid );
+  TrajectoryStateOnSurface tsos=surfExtrapTrkSam(trackRef, gdet->surface().position().z());
+  if (!tsos.isValid()) return result;
+  LocalPoint localTTPos = gdet->surface().toLocal(tsos.freeState()->position());
+  
+  const CSCChamberSpecs* chamberSpecs = cscGeom->chamber(detid)->specs();
+  const CSCLayerGeometry* layerGeometry = (detid.layer()%2==0)?chamberSpecs->evenLayerGeometry(detid.endcap()):chamberSpecs->oddLayerGeometry(detid.endcap());
+  const CSCWireTopology* wireTopology = layerGeometry->wireTopology();
+  Float_t wideWidth      = wireTopology->wideWidthOfPlane();
+  Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
+  Float_t length         = wireTopology->lengthOfPlane();
+  // If slanted, there is no y offset between local origin and symmetry center of wire plane
+  Float_t yOfFirstWire   = fabs(wireTopology->wireAngle())>1.E-06 ? -0.5*length : wireTopology->yOfWire(1);
+  // y offset between local origin and symmetry center of wire plane
+  Float_t yCOWPOffset    = yOfFirstWire+0.5*length;
+  // tangent of the incline angle from inside the trapezoid
+  Float_t tangent = (wideWidth-narrowWidth)/(2.*length);
+  // y position wrt bottom of trapezoid
+  Float_t yPrime  = localTTPos.y()+fabs(yOfFirstWire);
+  // half trapezoid width at y' is 0.5 * narrowWidth + x side of triangle with the above tangent and side y'
+  Float_t halfWidthAtYPrime = 0.5*narrowWidth+yPrime*tangent;
+  Float_t edgex = fabs(localTTPos.x()) - halfWidthAtYPrime;
+  Float_t edgey = fabs(localTTPos.y()-yCOWPOffset) - 0.5*length;
+  LocalError localTTErr = tsos.localError().positionError();
+  if ( edgex > edgey ) {
+    result[0] = edgex;
+    result[1] = sqrt( localTTErr.xx() );
+    //result[1] = sqrt(tsos.cartesianError().position().cxx()); 
+  }
+  else {
+    result[0] = edgey;
+    result[1] = sqrt( localTTErr.yy() );
+    //result[1] = sqrt(tsos.cartesianError().position().cyy());
+  }
+  result[2]=YDistToHVDeadZone(localTTPos.y(), detid.station()*10+detid.ring());
+  result[3]=sqrt( localTTErr.yy() );
+  return result;//return values: 1-edge;2-err of edge;3-disttogap;4-err of dist to gap
 }
 
 ////////////////////////////////////////////
@@ -1494,6 +1529,7 @@ TrajectoryStateOnSurface *TPTrackMuonSys::matchTTwithCSCSeg( reco::TrackRef trac
       cscSegOut = segIt;
     }
   }//loop over segments
+
   return TrajSuf;
 }
 //////////////  Get the matching with CSC-sgements...
