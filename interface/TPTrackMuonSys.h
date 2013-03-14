@@ -268,7 +268,7 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
 			    Float_t *delWkey
 			    );
 
-  LocalPoint * matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t rg, Short_t cham, 
+  LocalPoint * matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t &rg, Short_t cham, 
 			       edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, Float_t &dRTrkLCT, Int_t &lctBX );
 
   Int_t getNLayerMatchedCSCSeg(CSCSegmentCollection::const_iterator &cscSegMatch,
@@ -283,9 +283,9 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   edm::Handle<CSCSegmentCollection> cscSegments;
   edm::Handle<reco::MuonCollection> muons;
   edm::ESHandle<MagneticField> theBField;
-  edm::ESHandle<GlobalTrackingGeometry> theTrackingGeometry;
+  //edm::ESHandle<GlobalTrackingGeometry> theTrackingGeometry;
   // DT Geometry
-  edm::ESHandle<DTGeometry> dtGeom;
+  //edm::ESHandle<DTGeometry> dtGeom;
   edm::ESHandle<RPCGeometry> rpcGeo;
   // CSC Geometry
   edm::ESHandle<CSCGeometry> cscGeom;
@@ -432,14 +432,14 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Int_t CSCnSegHits[4];
 
   /*Distance from the Extrapolated Tracks to CSC Segments, 99999. for no CSC segment found*/
-  Float_t CSCDxyTTSeg[4],CSCDxTTSeg[4],CSCDyTTSeg[4],CSCDxyErrTTSeg[4];
+  Float_t CSCDxTTSeg[4],CSCDxErrTTSeg[4],CSCDyTTSeg[4],CSCDyErrTTSeg[4],CSCDxyTTSeg[4],CSCDxyErrTTSeg[4];
 
   /*LCT characteristics*/
   Float_t CSCLCTxLc[4],CSCLCTyLc[4];
   Int_t CSCLCTbx[4];
 
   /*Distance from the Extrapolated Tracks to LCT, 99999. for no LCT found*/
-  Float_t CSCDxyTTLCT[4],CSCDxTTLCT[4],CSCDyTTLCT[4],CSCDxyErrTTLCT[4];
+  Float_t CSCDxTTLCT[4],CSCDxErrTTLCT[4],CSCDyTTLCT[4],CSCDyErrTTLCT[4],CSCDxyTTLCT[4],CSCDxyErrTTLCT[4];
 
   /*DetlaR between the extrapolated tracker track on muon system and the tagged muon*/
   Float_t dRTkMu[4];  

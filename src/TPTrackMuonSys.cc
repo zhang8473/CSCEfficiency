@@ -204,13 +204,15 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
     MakeBranchAllSt("CSCdXdZTTSeg","F",CSCdXdZTTSeg);
     MakeBranchAllSt("CSCdYdZTTSeg","F",CSCdYdZTTSeg);
     MakeBranchAllSt("CSCSegChisqProb","F",CSCSegChisqProb);
-    MakeBranchAllSt("CSCnSegHits","I",CSCnSegHits) ;
+    MakeBranchAllSt("CSCnSegHits","I",CSCnSegHits);
 
     /*Distance from the Extrapolated Tracks to CSC Segments, 99999. for no CSC segment found*/ 
-    MakeBranchAllSt("CSCDxyTTSeg","F",CSCDxyTTSeg);
     MakeBranchAllSt("CSCDxTTSeg","F",CSCDxTTSeg);
+    MakeBranchAllSt("CSCDxErrTTSeg","F",CSCDxErrTTSeg);
     MakeBranchAllSt("CSCDyTTSeg","F",CSCDyTTSeg);
-    MakeBranchAllSt("CSCDxyErrTTSeg","F",CSCDxyErrTTSeg) ;
+    MakeBranchAllSt("CSCDyErrTTSeg","F",CSCDyErrTTSeg);
+    MakeBranchAllSt("CSCDxyTTSeg","F",CSCDxyTTSeg);
+    MakeBranchAllSt("CSCDxyErrTTSeg","F",CSCDxyErrTTSeg);
 
     /*LCT characteristics*/
     MakeBranchAllSt("CSCLCTxLc","F",CSCLCTxLc);
@@ -218,9 +220,11 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
     MakeBranchAllSt("CSCLCTbx","I",CSCLCTbx);
 
     /*Distance from the Extrapolated Tracks to LCT, 99999. for no LCT found*/
-    MakeBranchAllSt("CSCDxyTTLCT","F",CSCDxyTTLCT);
     MakeBranchAllSt("CSCDxTTLCT","F",CSCDxTTLCT);
+    MakeBranchAllSt("CSCDxErrTTLCT","F",CSCDxErrTTLCT);
     MakeBranchAllSt("CSCDyTTLCT","F",CSCDyTTLCT);
+    MakeBranchAllSt("CSCDxErrTTLCT","F",CSCDxErrTTLCT);
+    MakeBranchAllSt("CSCDxyTTLCT","F",CSCDxyTTLCT);
     MakeBranchAllSt("CSCDxyErrTTLCT","F",CSCDxyErrTTLCT);
 
     /*DetlaR between the extrapolated tracker track on muon system and the tagged muon*/
@@ -289,9 +293,9 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   //Get the Magnetic field from the setup
   setup.get<IdealMagneticFieldRecord>().get(theBField);
   // Get the GlobalTrackingGeometry from the setup
-  setup.get<GlobalTrackingGeometryRecord>().get(theTrackingGeometry);
+  // setup.get<GlobalTrackingGeometryRecord>().get(theTrackingGeometry);
   // Get the DT Geometry from the setup 
-  setup.get<MuonGeometryRecord>().get(dtGeom);
+  // setup.get<MuonGeometryRecord>().get(dtGeom);
 
   setup.get<MuonGeometryRecord>().get(cscGeom);
 
@@ -321,8 +325,8 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   edm::Handle<RPCRecHitCollection> rpcRecHits;
   event.getByLabel("rpcRecHits",rpcRecHits);
 
-  edm::Handle<DTRecSegment4DCollection> dtSegments;
-  event.getByLabel( "dt4DSegments", dtSegments );
+  //edm::Handle<DTRecSegment4DCollection> dtSegments;
+  //event.getByLabel( "dt4DSegments", dtSegments );
 
   edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts;
   try{
@@ -336,8 +340,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   setup.get<L1MuTriggerScalesRcd> ().get(trigscales_h);
   theTriggerScales = trigscales_h.product();
 
-  if (! dtSegments.isValid()) 
-    throw cms::Exception("FatalError") << "Unable to find DTRecSegment4DCollection in event!\n";
+  //if (! dtSegments.isValid()) throw cms::Exception("FatalError") << "Unable to find DTRecSegment4DCollection in event!\n";
 
   std::vector<DetId> chamberIds;
   std::vector<DetId>::const_iterator chamberIdIt;
@@ -920,19 +923,23 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	CSCdYdZTTSeg[j]=-9999.;
 	CSCnSegHits[j]=-9999;
 	/*Distance from the Extrapolated Tracks to CSC Segments, 9999. for no CSC segment found*/ 
-	CSCDxyTTSeg[j]=-9999.;
-	CSCDxTTSeg[j]=-9999.;
-	CSCDyTTSeg[j]=-9999.;
-	CSCDxyErrTTSeg[j]=-9999.;
+	CSCDxTTSeg[j] = -9999.;
+	CSCDxErrTTSeg[j] = -9999.;
+	CSCDyTTSeg[j] = -9999.;
+	CSCDyErrTTSeg[j] = -9999.;
+        CSCDxyTTSeg[j] = -9999.;
+ 	CSCDxyErrTTSeg[j] = -9999.;
 	/*LCT characteristics*/
 	CSCLCTxLc[j] = -9999.;
 	CSCLCTyLc[j] = -9999.;
 	CSCLCTbx[j] = -9999;
 	/*Distance from the Extrapolated Tracks to LCT, 9999. for no LCT found*/
-	CSCDxyTTLCT[j] = -9999.;
 	CSCDxTTLCT[j] = -9999.;
+	CSCDxErrTTLCT[j] = -9999.;
 	CSCDyTTLCT[j] = -9999.;
-	CSCDxyErrTTLCT[j] = -9999.;
+	CSCDyErrTTLCT[j] = -9999.;
+        CSCDxyTTLCT[j] = -9999.;
+ 	CSCDxyErrTTLCT[j] = -9999.;
 	/*DetlaR between the extrapolated tracker track on muon system and the tagged muon*/
 	dRTkMu[j] = -9999.;
 	/*Default decision of whether a segment or LCT is found*/
@@ -1034,9 +1041,10 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	  CSCDxyTTSeg[st] = sqrt(pow(CSCDxTTSeg[st],2)+pow(CSCDyTTSeg[st],2));
 
 	  LocalError localTTErr =TrajToSeg->localError().positionError();
-	  Float_t CSCdeltaXErr2 = localSegErr.xx() + localTTErr.xx();
-	  Float_t CSCdeltaYErr2 = localSegErr.yy() + localTTErr.yy();
-	  CSCDxyErrTTSeg[st] = sqrt(pow(CSCDxTTSeg[st],2)*CSCdeltaXErr2+pow(CSCDyTTSeg[st],2)*CSCdeltaYErr2)/CSCDxyTTSeg[st];
+	  CSCDxErrTTSeg[st] = localSegErr.xx() + localTTErr.xx(); //the x error of the distance between segment and track squared
+	  CSCDyErrTTSeg[st] = localSegErr.yy() + localTTErr.yy(); //the y error of the distance between segment and track squared
+	  CSCDxyErrTTSeg[st] = sqrt(pow(CSCDxTTSeg[st],2)*CSCDxErrTTSeg[st]+pow(CSCDyTTSeg[st],2)*CSCDyErrTTSeg[st])/CSCDxyTTSeg[st];
+	  CSCDxErrTTSeg[st] = sqrt(CSCDxErrTTSeg[st]); CSCDyErrTTSeg[st] = sqrt(CSCDyErrTTSeg[st]);       
 	    
 	  LocalVector trackLocalDir = TrajToSeg->localDirection();
 	  LocalVector segDir = (*cscSegOut).localDirection();
@@ -1058,8 +1066,6 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	tsos=surfExtrapTrkSam(trackRef, Layer3gdet->surface().position().z());
 	if (tsos.isValid()) {
 	  LocalPoint localL3pCSC = Layer3gdet->surface().toLocal(tsos.freeState()->position());
-	  //cerr<<"TTLCTx,TTLCTy,TTLCTxy:"<<CSCDxTTLCT[st]<<","<<CSCDyTTLCT[st]<<","<<CSCDxyTTLCT[st]<<endl;
-	  //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
 	  LocalPoint *LCTPos=matchTTwithLCTs( localL3pCSC.x(), localL3pCSC.y(), CSCEndCapPlus?1:2, st+1, CSCRg[st], CSCChCand[st], mpclcts, CSCDxyTTLCT[st], CSCLCTbx[st]);
 	  if (LCTPos!=NULL) {
 	    CSCLCTxLc[st]=LCTPos->x();
@@ -1068,8 +1074,11 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	    CSCDyTTLCT[st]=CSCLCTyLc[st]-localL3pCSC.y();
 	    CSCDxyTTLCT[st] = sqrt(pow(CSCDxTTLCT[st],2)+pow(CSCDyTTLCT[st],2));
 	    LocalError localTTErr =tsos.localError().positionError();
+	    CSCDxErrTTLCT[st] = sqrt(localTTErr.xx()); CSCDyErrTTLCT[st] = sqrt(localTTErr.yy());
 	    CSCDxyErrTTLCT[st] =sqrt(pow(CSCDxTTLCT[st],2)*localTTErr.xx() + pow(CSCDyTTLCT[st],2)*localTTErr.yy())/CSCDxyTTLCT[st];
-	  }
+            //cerr<<"ME"<<st+1<<CSCRg[st]<<":TTLCTx,TTLCTy,TTLCTxy:"<<CSCDxTTLCT[st]<<","<<CSCDyTTLCT[st]<<","<<CSCDxyTTLCT[st]<<endl;
+            //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
+ 	  }
 	}
       } // for loop for the stations -- j
       /*
@@ -1283,6 +1292,7 @@ vector<Float_t> TPTrackMuonSys::GetEdgeAndDistToGap(reco::TrackRef trackRef, CSC
   Float_t edgex = fabs(localTTPos.x()) - halfWidthAtYPrime;
   Float_t edgey = fabs(localTTPos.y()-yCOWPOffset) - 0.5*length;
   LocalError localTTErr = tsos.localError().positionError();
+  //  cerr<<"x err = "<<sqrt(localTTErr.xx())<<" ; y err = "<<sqrt(localTTErr.yy())<<endl;
   if ( edgex > edgey ) {
     result[0] = edgex;
     result[1] = sqrt( localTTErr.xx() );
@@ -1440,7 +1450,7 @@ Bool_t TPTrackMuonSys::matchTTwithRPCEChit(Bool_t trackDir,
 }
 
 //////////////  Get the matching with LCTs...
-LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t rg, Short_t cham, 
+LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t &rg, Short_t cham, 
 					     edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, Float_t &dRTrkLCT, Int_t &lctBX ) {
   LocalPoint *interSect=NULL;
   
@@ -1462,8 +1472,10 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
     for (CSCCorrelatedLCTDigiCollection::const_iterator mpcIt = MPCrange.first; mpcIt != MPCrange.second; mpcIt++) {
       Bool_t lct_valid = (*mpcIt).isValid();
       if(!lct_valid)continue;
-      Int_t wireGroup_id = (*mpcIt).getKeyWG();
-      Float_t strip_id = (*mpcIt).getStrip()/2.;
+      //In CSC offline/hlt software in general, is COUNT FROM ONE, such as CSCGeometry.
+      //However, the LCT software counts from zero. strip_id is from 0 to 159. wireGroup_id is from 0 to 79. So here we need to plus one.
+      Int_t wireGroup_id = (*mpcIt).getKeyWG()+1;
+      Float_t strip_id = (*mpcIt).getStrip()/2.+1;
       const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer (3)->geometry ();
       const Int_t Nstrips=layerGeom->numberOfStrips();
       Bool_t me11a = ( (st == 1) && (id.ring() == 1 || id.ring() == 4) && strip_id>Nstrips );
@@ -1472,16 +1484,13 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
 	if ( strip_id>Nstrips ) LogWarning("Strip_id") << "Got "<<strip_id<<", but there are "<< Nstrips <<" strips in total." <<m_hlt.process();
 	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(Int_t(strip_id), wireGroup_id);
 	//	printf( "ME%d/%d: %.1f/%d, %d/%d: xLCT-xTT=%.2f-%.2f; yLCT-yTT=%.2f-%.2f \n",st,id.ring(),strip_id,Nstrips,wireGroup_id,layerGeom->numberOfWireGroups(),interSect_.x(),xPos,interSect_.y(),yPos);
-	if ( strip_id>Int_t(strip_id) ) {//the staggers of strips, which happens for layer 1,3,5
-	  LocalPoint interSect_plus = layerGeom->stripWireGroupIntersection(Int_t(strip_id)+1, wireGroup_id);
-	  interSect_=LocalPoint( (interSect_.x()+interSect_plus.x())/2., (interSect_.y()+interSect_plus.y())/2. );
-	  //	  printf( "corrected ME%d/%d: %.1f/%d, %d/%d: xLCT-xTT=%.2f-%.2f; yLCT-yTT=%.2f-%.2f \n",st,id.ring(),strip_id,Nstrips,wireGroup_id,layerGeom->numberOfWireGroups(),interSect_.x(),xPos,interSect_.y(),yPos);
-	}
 	Float_t DeltaR_ = sqrt(pow((interSect_.x()-xPos),2) + pow((interSect_.y()-yPos),2));
 	if( DeltaR_ < fabs(dRTrkLCT) ) {
 	  interSect=new LocalPoint(interSect_);
 	  dRTrkLCT =  DeltaR_ ;
 	  lctBX = (*mpcIt).getBX();
+	  if (me11a) rg=4;
+	  else rg=id.ring();
 	  //cout << "1: BX = " << (*mpcIt).getBX() << " BX0 = " << (*mpcIt).getBX0() << std::endl;
 	} // for the matching if statement...
 	if (me11a) strip_id+=16.;
