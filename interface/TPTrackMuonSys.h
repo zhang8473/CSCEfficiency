@@ -216,7 +216,6 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   
   void chamberCandidates(Int_t station, Float_t feta, Float_t phi, std::vector <int> &coupleOfChambers);
   Int_t ringCandidate(Int_t station, Float_t feta, Float_t phi);
-  void fillChamberPosition();
   Short_t thisChamberCandidate(Short_t station, Short_t ring, Float_t phi);
 
   ///// Functions needed...
@@ -297,12 +296,6 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   // counters
   Int_t nEventsAnalyzed;
   Int_t treeCount;
-
-  Float_t StationOnePhi[36];
-  Float_t StationTwoOnePhi[18], StationTwoTwoPhi[36];
-  Float_t StationThreeOnePhi[18], StationThreeTwoPhi[36];
-  Float_t StationFourOnePhi[18], StationFourTwoPhi[36];
-
 
   unsigned long long etime; 
   Int_t bunchX, orbitNumb, expType, LumiBlock;

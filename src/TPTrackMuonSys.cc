@@ -253,7 +253,6 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
   RunInfo->Branch("HLTDiMuName",&HLTDiMuName);
   RunInfo->Branch("HLTDiMuObjModuleName",&HLTDiMuObjModuleName);
   RunInfo->Branch("BadCSCChamberIndexList",&badChambersIndices);
-  fillChamberPosition();
 }
 
 TPTrackMuonSys::~TPTrackMuonSys(){
@@ -959,8 +958,15 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	Int_t st = j>2?j-2:0, ec=CSCEndCapPlus?1:2; // determine the station number...
 	Float_t trkEta = tsos.globalPosition().eta(), trkPhi = tsos.globalPosition().phi();
 
-	Int_t rg = ringCandidate(st+1, trkEta, trkPhi);
-	if (rg==-9999) continue;
+	Short_t rg = ringCandidate(st+1, trkEta, trkPhi);
+	if ( rg==-9999) continue;
+	if (!(
+	      (j==0&&(rg==1||rg==4)) ||
+	      (j==1&&rg==2) ||
+	      (j==2&&rg==3) ||
+	      (j>2)
+	      )) continue;//check if it is runing on the right ring for a certain Z
+	else CSCRg[st]=rg;
 
 	//for chamber overlap region
 	/* This part of code is useless. Just directly extrapolate to chamber
@@ -971,9 +977,13 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	if(!CSCEndCapPlus)zzPlaneME = -zzPlaneME;	 
 
 	tsos = surfExtrapTrkSam(trackRef, zzPlaneME);
-	if (!tsos.isValid()) continue;*/
-
+	if (!tsos.isValid()) continue;
 	trkEta = tsos.globalPosition().eta(); trkPhi =  tsos.globalPosition().phi();
+	rg = ringCandidate(st+1, trkEta, trkPhi);
+	if ( rg==-9999 ) continue;
+	*/
+
+	//Calculate the solid angle between the muon and this extrapolated track
 	if(trkPhi  < 0) trkPhi += 2*M_PI;
 	/*dR between muon and track*/
 	Float_t MPhi = phiMuVec[st];
@@ -982,19 +992,33 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	if(TPhi < 0 ) TPhi += 2*M_PI;
 	dRTkMu[st] = deltaR( etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi);
 //	printf("Mu(%f,%f),Trk(%f,%f)-->dR(%f)",etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi,dRTkMu[st]);
-
-	CSCRg[st] = ringCandidate(st+1, trkEta, trkPhi);
-	if ( CSCRg[st]==0 ) continue;
-
-	CSCChCand[st] = thisChamberCandidate(st+1, CSCRg[st], trkPhi);
+	//Find the chamber candidate. If two chamber overlaps, simply divide them from middle. e.g. if chamber1 is from phi=1-3, chamber 2 is from phi=2-4. Then phi=1-2.5-->chamber 1; phi=2.5-4-->chamber 2. Since the distribution over phi is uniform, it won't bias the result.
+	CSCChCand[st] = thisChamberCandidate(st+1, rg, trkPhi);
 	CSCDetId Layer0Id=CSCDetId(ec, st+1, rg,  CSCChCand[st], 0);//layer 0 is the mid point of the chamber. It is not a real layer.
 	CSCChBad[st] = badChambers_->isInBadChamber( Layer0Id );
 #ifdef jz_debug
-	if (CSCChBad[st]) cerr<<(CSCEndCapPlus?"ME+":"ME-")<<st+1<<"/"<<CSCRg[st]<<"/"<<CSCChBad[st]<<" is a dead chamber."<<endl;
+	if (CSCChBad[st]) cerr<<(CSCEndCapPlus?"ME+":"ME-")<<st+1<<"/"<<rg<<"/"<<CSCChBad[st]<<" is a dead chamber."<<endl;
 #endif
+	/*Not necessary. Chamber search using phi is accurate enough.
+	CSCDetId Layerid  = CSCDetId( ec, st+1, rg,  CSCChCand[st], 1 );
+	vector<Float_t> EdgeAndDistToGap( GetEdgeAndDistToGap(trackRef,Layerid) );//values: 1-edge;2-err of edge;3-disttogap;4-err of dist to gap
+	if (EdgeAndDistToGap[0]>0.||EdgeAndDistToGap[0]<-9990.) {
+	  cerr<<"ch"<<CSCChCand[st]<<", oldedge="<<EdgeAndDistToGap[0]<<"cm --> ";
+	  //try neighborhood chambers
+	  CSCDetId Layerid_plusone  = CSCDetId( ec, st+1, rg,  CSCChCand[st]+1, 1 );
+	  vector<Float_t> EdgeAndDistToGap_plusone( GetEdgeAndDistToGap(trackRef,Layerid_plusone) );
+	  CSCDetId Layerid_minusone  = CSCDetId( ec, st+1, rg,  CSCChCand[st]-1, 1 );
+	  vector<Float_t> EdgeAndDistToGap_minusone( GetEdgeAndDistToGap(trackRef,Layerid_minusone) );
+	  if (EdgeAndDistToGap_plusone[0]<EdgeAndDistToGap[0]&&EdgeAndDistToGap_plusone[0]>-9990.) {
+	    if (EdgeAndDistToGap_minusone[0]>EdgeAndDistToGap_plusone[0]) CSCChCand[st]+=1;
+	    else { if (EdgeAndDistToGap_minusone[0]>-9990.) CSCChCand[st]-=1;}
+	  }
+	  else { if (EdgeAndDistToGap_minusone[0]<EdgeAndDistToGap[0]&&EdgeAndDistToGap_minusone[0]>-9990.) CSCChCand[st]-=1;}
+	  cerr<<"ch"<<CSCChCand[st]<<", plusoneedge="<<EdgeAndDistToGap_plusone[0]<<"cm,"<<", minusoneedge="<<EdgeAndDistToGap_minusone[0]<<"cm."<<endl;
+	  }*/
 	for (Int_t ly=1;ly<7;ly++) {
-	  CSCDetId ID  = CSCDetId( ec, st+1, rg,  CSCChCand[st], ly );
-	  vector<Float_t> EdgeAndDistToGap( GetEdgeAndDistToGap(trackRef,ID) );//values: 1-edge;2-err of edge;3-disttogap;4-err of dist to gap
+	  CSCDetId Layerid = CSCDetId( ec, st+1, rg,  CSCChCand[st], ly );
+	  vector<Float_t> EdgeAndDistToGap( GetEdgeAndDistToGap(trackRef,Layerid) );//values: 1-edge;2-err of edge;3-disttogap;4-err of dist to gap
 	  if (EdgeAndDistToGap[0]>CSCProjEdgeDist[st]) {
 	    CSCProjEdgeDist[st]=EdgeAndDistToGap[0];
 	    CSCProjEdgeDistErr[st]=EdgeAndDistToGap[1];
@@ -1076,16 +1100,16 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	    LocalError localTTErr =tsos.localError().positionError();
 	    CSCDxErrTTLCT[st] = sqrt(localTTErr.xx()); CSCDyErrTTLCT[st] = sqrt(localTTErr.yy());
 	    CSCDxyErrTTLCT[st] =sqrt(pow(CSCDxTTLCT[st],2)*localTTErr.xx() + pow(CSCDyTTLCT[st],2)*localTTErr.yy())/CSCDxyTTLCT[st];
-            //cerr<<"ME"<<st+1<<CSCRg[st]<<":TTLCTx,TTLCTy,TTLCTxy:"<<CSCDxTTLCT[st]<<","<<CSCDyTTLCT[st]<<","<<CSCDxyTTLCT[st]<<endl;
-            //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
- 	  }
-	}
+	    //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
+ 	  }//end of if found LCT
+	}//end of if layer 3 extrapolation is available
       } // for loop for the stations -- j
       /*
       for (Byte_t st=0;st<4;st++) {
 	lctSt[st] = ( CSCDxyTTLCT[st] >0. && CSCDxyTTLCT[st] < 40 )?1:0;
 	segSt[st] = ( CSCDxyTTSeg[st] >0. && CSCDxyTTSeg[st] < 40)?1:0;
 	}*/
+      //cerr<<"eta="<<tracks_eta<<":ME1"<<CSCRg[0]<<":TTLCTx,TTLCTy,TTLCTxy:"<<CSCDxTTLCT[0]<<","<<CSCDyTTLCT[0]<<","<<CSCDxyTTLCT[0]<<endl;
       fractNtuple->Fill();
       firsttrackmatchingtoMuTag=false;
     } // loop over tracks...
@@ -1514,7 +1538,7 @@ inline Float_t TPTrackMuonSys::TrajectoryDistToSeg( TrajectoryStateOnSurface *Tr
 TrajectoryStateOnSurface *TPTrackMuonSys::matchTTwithCSCSeg( reco::TrackRef trackRef, edm::Handle<CSCSegmentCollection> cscSegments, 
 							     CSCSegmentCollection::const_iterator &cscSegOut, CSCDetId & idCSC ) {
   TrajectoryStateOnSurface *TrajSuf=NULL;
-  Float_t deltaCSCR = 50.0;
+  Float_t deltaCSCR = 9999.;
   for(CSCSegmentCollection::const_iterator segIt=cscSegments->begin(); segIt != cscSegments->end(); segIt++) {
     CSCDetId id  = (CSCDetId)(*segIt).cscDetId();
     if(idCSC.endcap() != id.endcap())continue;
@@ -1899,15 +1923,18 @@ Int_t TPTrackMuonSys::ringCandidate(Int_t station, Float_t feta, Float_t phi){
     if(fabs(feta)>=1.18 && fabs(feta)<=1.5){//ME12 if(fabs(feta)>1.18 && fabs(feta)<1.7){//ME12
       ring = 2;
     }
-    if(fabs(feta)>1.5 && fabs(feta)<2.45){//ME11
-      ring = 1; //or 4;
+    if(fabs(feta)>1.5 && fabs(feta)<2.1){//ME11
+      ring = 1;
+    }
+    if(fabs(feta)>=2.1 && fabs(feta)<2.5){//ME11
+      ring = 4;
     }
     break;
   case 2:
     if(fabs(feta)>0.95 && fabs(feta)<1.6){//ME22
       ring = 2;      
     }  
-    if(fabs(feta)>1.55 && fabs(feta)<2.45){//ME21
+    if(fabs(feta)>1.55 && fabs(feta)<2.5){//ME21
       ring = 1;      
     }
     break;
@@ -1915,12 +1942,12 @@ Int_t TPTrackMuonSys::ringCandidate(Int_t station, Float_t feta, Float_t phi){
     if(fabs(feta)>1.08 && fabs(feta)<1.72){//ME32
       ring = 2;            
     }  
-    if(fabs(feta)>1.69 && fabs(feta)<2.45){//ME31
+    if(fabs(feta)>1.69 && fabs(feta)<2.5){//ME31
       ring = 1; 
     }
     break;
   case 4:
-    if(fabs(feta)>1.78 && fabs(feta) <2.45){//ME41
+    if(fabs(feta)>1.78 && fabs(feta) <2.5){//ME41
       ring = 1; 
     }
     if(fabs(feta)>1.15 && fabs(feta) <=1.78){//ME42
@@ -1935,129 +1962,15 @@ Int_t TPTrackMuonSys::ringCandidate(Int_t station, Float_t feta, Float_t phi){
 }
 
 Short_t TPTrackMuonSys::thisChamberCandidate(Short_t station, Short_t ring, Float_t phi){
-
-  //  double minDelPhi = 0.17; Int_t station, Int_t ring, Float_t phi
-  
-  Float_t *MyPhiValues=NULL;
-  //36 chambers
-  if (station == 1)  MyPhiValues = StationOnePhi;
-  if (station == 2 && ring == 2) MyPhiValues = StationTwoTwoPhi;
-  if (station == 3 && ring == 2) MyPhiValues = StationThreeTwoPhi;
-  if (station == 4 && ring == 2) MyPhiValues = StationFourTwoPhi;
-  //18 chambers
-  if(station == 2 && ring == 1) MyPhiValues = StationTwoOnePhi;
-  if(station == 3 && ring == 1) MyPhiValues = StationThreeOnePhi;
-  if(station == 4 && ring == 1) MyPhiValues = StationFourOnePhi;
-  
-  if ( MyPhiValues==NULL ) {
-    LogError("")<<"Invalid station and ring: "<<station<<"/"<<ring<<endl;
-    return 0;
-  }
-  
-  Int_t iCh=0;
-  if(phi < 0.) phi = phi + 2*M_PI;
-
-  Short_t nVal = 36;
-  if(station != 1 && ring == 1) nVal = 18;
-
-  double minDelPhi = 100000.;
-  for (Short_t i = 0; i < nVal; i++){
-    double dphi = deltaPhi(MyPhiValues[i], phi);
-    if(fabs(dphi) < minDelPhi){
-      minDelPhi = fabs(dphi);
-      iCh = i+2;
-    }
-  }
-  if(iCh > nVal)iCh = 1;
-  return iCh;
-}
-
-
-void TPTrackMuonSys::fillChamberPosition(){
-  TVector3 x(0,0,1);
-  for (Int_t i = 0; i < 36; i++){
-    StationOnePhi[i] = 0.0;
-    StationTwoTwoPhi[i] = 0.0;
-    StationThreeTwoPhi[i] = 0.0;
-    StationFourTwoPhi[i] = 0.0;
-    if(i < 18){
-      StationTwoOnePhi[i] = 0.0;
-      StationThreeOnePhi[i] = 0.0;
-      StationFourOnePhi[i] = 0.0;
-    }
-  }
-
-  /////////////////////////////////
-
-  TVector3 pp(180.5,0,0);
-  for (Int_t i = 0; i < 36; i++){
-    pp.Rotate(2*M_PI/36,x);
-    StationOnePhi[i]  = pp.Phi();
-    if(StationOnePhi[i] < 0)StationOnePhi[i] = StationOnePhi[i] + 2*M_PI;
-#ifdef m_debug
-    std::cout << " PHI(1-" << i << ")" << StationOnePhi[i];
-#endif
-  }
-  std::cout << std::endl;
-  
-  TVector3 pp1(241.73,0,0);
-  pp1.Rotate(M_PI/36 ,x);
-  for (Int_t i = 0; i < 18; i++){
-    pp1.Rotate(2*M_PI/18,x);
-    StationTwoOnePhi[i]  = pp1.Phi();
-    if(StationTwoOnePhi[i] < 0)StationTwoOnePhi[i] = StationTwoOnePhi[i] + 2*M_PI;
-#ifdef m_debug
-    std::cout << " PHI(2/1-" << i << ")" << StationTwoOnePhi[i];
-#endif
-  }
-  std::cout << std::endl;
-
-  TVector3 pp2(707.56,0,0);
-  for (Int_t i = 0; i < 36; i++){
-    pp2.Rotate(2*M_PI/36,x);
-    StationTwoTwoPhi[i]  = pp2.Phi();
-    if(StationTwoTwoPhi[i] < 0)StationTwoTwoPhi[i] = StationTwoTwoPhi[i] + 2*M_PI;
-#ifdef m_debug
-    std::cout << " PHI(2/2-" << i << ")" << StationTwoTwoPhi[i];
-#endif
-  }
-  std::cout << std::endl;
-
-  TVector3 pp3(251.74, 0.0, 0.0);
-  pp3.Rotate(M_PI/36,x);
-  //pp3.Rotate(0.0511,x);
-  for (Int_t i = 0; i < 18; i++){
-    pp3.Rotate(2*M_PI/18,x);
-    StationThreeOnePhi[i]  = pp3.Phi();	
-    if(StationThreeOnePhi[i] < 0)StationThreeOnePhi[i] = StationThreeOnePhi[i] + 2*M_PI;
-#ifdef m_debug
-    std::cout << " PHI(3/1-" << i << ")" << StationThreeOnePhi[i];
-#endif
-  }
-  std::cout << std::endl;
-
-  TVector3 pp4(525.55,0.0,0);
-  for (Int_t i = 0; i < 36; i++){
-    pp4.Rotate(2*M_PI/36,x);
-    StationThreeTwoPhi[i]  = pp4.Phi();
-    if(StationThreeTwoPhi[i] < 0)StationThreeTwoPhi[i] = StationThreeTwoPhi[i] + 2*M_PI;
-#ifdef m_debug
-    std::cout << " PHI(3/2-" << i << ")" << StationThreeTwoPhi[i];
-#endif
-  }
-  std::cout << std::endl;
-
-  TVector3 pp5(261.7,0.,0.);
-  pp5.Rotate(M_PI/36,x);
-  for (Int_t i = 0; i < 18; i++){
-    pp5.Rotate(2*M_PI/18,x);
-    StationFourOnePhi[i]  = pp5.Phi();
-    if(StationFourOnePhi[i] < 0)StationFourOnePhi[i] = StationFourOnePhi[i] + 2*M_PI;
-#ifdef m_debug
-    std::cout << " PHI(4/1-" << i << ")" << StationFourOnePhi[i];
-#endif
-  }
-  std::cout << std::endl;
+  //search for chamber candidate based on CMS IN-2007/024
+  //10 deg chambers are ME1,ME22,ME32,ME42 chambers; 20 deg chambers are ME21,31,41 chambers
+  //Chambers one always starts from approx -5 deg. The following phis are center lines, so 20 deg chambers shifts 5 deg.
+  const Short_t nVal = (station>1 && ring == 1)?18:36;
+  const Float_t ChamberSpan=2*M_PI/nVal;
+  double dphi = phi + M_PI/36;
+  while (dphi > 2*M_PI) dphi -= 2*M_PI;
+  while (dphi < 0) dphi += 2*M_PI;
+  return Int_t(dphi/ChamberSpan)+1;
 }
 
 ///////////////////////
