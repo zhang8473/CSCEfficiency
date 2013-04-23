@@ -65,7 +65,7 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
 
 
   //////////////////// for LUTs
-
+  /*
   bzero(srLUTs_, sizeof(srLUTs_));
   //Int_t endcap =1, sector =1;
   Bool_t TMB07=true;
@@ -86,7 +86,7 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
       } // stationItr loop
     } // sectorItr loop
   } // endcapItr loop
-  
+  */
   // ------------------------------
   // --- Summary ntuple booking ---
   // ------------------------------
@@ -297,7 +297,31 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   // setup.get<MuonGeometryRecord>().get(dtGeom);
 
   setup.get<MuonGeometryRecord>().get(cscGeom);
-
+#ifdef m_debug
+  //describe the chamber active region outline
+  if (nEventsAnalyzed==1) {
+    Short_t rings[]={11,14,12,13,21,31,41,22};
+    for (Byte_t iring=0;iring<8;iring++) {
+      CSCDetId id=CSCDetId(1, rings[iring]/10, rings[iring]%10, 1, 1);
+      printf("============ ME%d chamber outline=============\n",rings[iring]);
+      const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer(1)->geometry ();
+      const Byte_t NStrips=layerGeom->numberOfStrips(),NWires=layerGeom->numberOfWireGroups();
+      LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(1, 1);
+      printf("(strip 1, wire group 1) at (%.3f,%.3f)\n",interSect_.x(),interSect_.y());
+      interSect_ = layerGeom->stripWireGroupIntersection(NStrips, 1);
+      printf("(strip %d, wire group 1) at (%.3f,%.3f)\n",NStrips,interSect_.x(),interSect_.y());
+      interSect_ = layerGeom->stripWireGroupIntersection(NStrips, NWires);
+      printf("(strip %d, wire group %d) at (%.3f,%.3f)\n",NStrips, NWires,interSect_.x(),interSect_.y());
+      interSect_ = layerGeom->stripWireGroupIntersection(1, NWires);
+      printf("(strip 1, wire group %d) at (%.3f,%.3f)\n", NWires,interSect_.x(),interSect_.y());
+      printf("   ======== middle x of wires(check)==========\n");
+      const CSCWireTopology* wireTopology = layerGeom->wireTopology();
+      for (Short_t wireGroup_id=1;wireGroup_id<=NWires;wireGroup_id+=(NWires-1)/3) {
+	printf("x center of wire %d is at %.3f\n",wireGroup_id,wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id))[0]);
+      }
+    }
+  }
+#endif
   // Get the propagators
   setup.get<TrackingComponentsRecord>().get("SmartPropagatorAnyRK", propagatorAlong   );
   setup.get<TrackingComponentsRecord>().get("SmartPropagatorAnyOpposite", propagatorOpposite);
@@ -319,14 +343,6 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   // get CSC segment collection
   event.getByLabel("cscSegments", cscSegments); 
 
-  setup.get<MuonGeometryRecord>().get(rpcGeo);
-   
-  edm::Handle<RPCRecHitCollection> rpcRecHits;
-  event.getByLabel("rpcRecHits",rpcRecHits);
-
-  //edm::Handle<DTRecSegment4DCollection> dtSegments;
-  //event.getByLabel( "dt4DSegments", dtSegments );
-
   edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts;
   try{
     event.getByLabel("csctfunpacker","", mpclcts);
@@ -334,6 +350,17 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
     edm::LogError("")<< "Error! Can't get m_gTracksTag by label. ";
   }
    
+  /*
+  // get RPC and DT
+  setup.get<MuonGeometryRecord>().get(rpcGeo);
+   
+  edm::Handle<RPCRecHitCollection> rpcRecHits;
+  event.getByLabel("rpcRecHits",rpcRecHits);
+
+  edm::Handle<DTRecSegment4DCollection> dtSegments;
+  event.getByLabel( "dt4DSegments", dtSegments );
+  */
+
   //  muon trigger scales
   edm::ESHandle<L1MuTriggerScales> trigscales_h;
   setup.get<L1MuTriggerScalesRcd> ().get(trigscales_h);
@@ -987,15 +1014,17 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	if(trkPhi  < 0) trkPhi += 2*M_PI;
 	/*dR between muon and track*/
 	Float_t MPhi = phiMuVec[st];
-	if(MPhi < 0 ) MPhi +=  2*M_PI;
+	if (MPhi < 0 ) MPhi +=  2*M_PI;
 	Float_t TPhi = tsos.globalPosition().phi();
-	if(TPhi < 0 ) TPhi += 2*M_PI;
+	if (TPhi < 0 ) TPhi += 2*M_PI;
 	dRTkMu[st] = deltaR( etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi);
 //	printf("Mu(%f,%f),Trk(%f,%f)-->dR(%f)",etaMuVec[st], MPhi, tsos.globalPosition().eta() , TPhi,dRTkMu[st]);
 	//Find the chamber candidate. If two chamber overlaps, simply divide them from middle. e.g. if chamber1 is from phi=1-3, chamber 2 is from phi=2-4. Then phi=1-2.5-->chamber 1; phi=2.5-4-->chamber 2. Since the distribution over phi is uniform, it won't bias the result.
 	CSCChCand[st] = thisChamberCandidate(st+1, rg, trkPhi);
 	CSCDetId Layer0Id=CSCDetId(ec, st+1, rg,  CSCChCand[st], 0);//layer 0 is the mid point of the chamber. It is not a real layer.
 	CSCChBad[st] = badChambers_->isInBadChamber( Layer0Id );
+	//skip not-existing ME42 chambers
+	if (CSCChBad[st]&&st==3&&rg==2) continue;
 #ifdef jz_debug
 	if (CSCChBad[st]) cerr<<(CSCEndCapPlus?"ME+":"ME-")<<st+1<<"/"<<rg<<"/"<<CSCChBad[st]<<" is a dead chamber."<<endl;
 #endif
@@ -1296,10 +1325,7 @@ vector<Float_t> TPTrackMuonSys::GetEdgeAndDistToGap(reco::TrackRef trackRef, CSC
   TrajectoryStateOnSurface tsos=surfExtrapTrkSam(trackRef, gdet->surface().position().z());
   if (!tsos.isValid()) return result;
   LocalPoint localTTPos = gdet->surface().toLocal(tsos.freeState()->position());
-  
-  const CSCChamberSpecs* chamberSpecs = cscGeom->chamber(detid)->specs();
-  const CSCLayerGeometry* layerGeometry = (detid.layer()%2==0)?chamberSpecs->evenLayerGeometry(detid.endcap()):chamberSpecs->oddLayerGeometry(detid.endcap());
-  const CSCWireTopology* wireTopology = layerGeometry->wireTopology();
+  const CSCWireTopology* wireTopology = cscGeom->chamber(detid)->layer(detid.layer())->geometry()->wireTopology();
   Float_t wideWidth      = wireTopology->wideWidthOfPlane();
   Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
   Float_t length         = wireTopology->lengthOfPlane();
@@ -1313,6 +1339,7 @@ vector<Float_t> TPTrackMuonSys::GetEdgeAndDistToGap(reco::TrackRef trackRef, CSC
   Float_t yPrime  = localTTPos.y()+fabs(yOfFirstWire);
   // half trapezoid width at y' is 0.5 * narrowWidth + x side of triangle with the above tangent and side y'
   Float_t halfWidthAtYPrime = 0.5*narrowWidth+yPrime*tangent;
+  // x offset between local origin and symmetry center of wire plane is zero
   Float_t edgex = fabs(localTTPos.x()) - halfWidthAtYPrime;
   Float_t edgey = fabs(localTTPos.y()-yCOWPOffset) - 0.5*length;
   LocalError localTTErr = tsos.localError().positionError();
@@ -1418,6 +1445,7 @@ Bool_t TPTrackMuonSys::matchTTwithCSCRecHit(Bool_t trackDir,
 }
 
 ////// Match TT with RPCEndCapHit
+/*
 Bool_t TPTrackMuonSys::matchTTwithRPCEChit(Bool_t trackDir, 
 					   Int_t j, 
 					   reco::TrackRef trackRef, 
@@ -1472,7 +1500,7 @@ Bool_t TPTrackMuonSys::matchTTwithRPCEChit(Bool_t trackDir,
    
   return aMatch;
 }
-
+*/
 //////////////  Get the matching with LCTs...
 LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t &rg, Short_t cham, 
 					     edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, Float_t &dRTrkLCT, Int_t &lctBX ) {
@@ -1489,24 +1517,33 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
     Bool_t ed1 = (st == 1) && ((rg == 1 || rg == 4) && (id.ring() == 1 || id.ring() == 4));
     Bool_t ed2 = (st == 1) && ((rg == 2 && id.ring() == 2) || (rg == 3 && id.ring() == 3));
     Bool_t ed3 = (st != 1) && (rg == id.ring());
-    Bool_t TMCSCMatch = (ed1 || ed2 || ed3);
-    if(! TMCSCMatch)continue;
-
+    if ( !(ed1 || ed2 || ed3) ) continue;
     const CSCCorrelatedLCTDigiCollection::Range& MPCrange = (*detMPCUnitIt).second;
     for (CSCCorrelatedLCTDigiCollection::const_iterator mpcIt = MPCrange.first; mpcIt != MPCrange.second; mpcIt++) {
       Bool_t lct_valid = (*mpcIt).isValid();
       if(!lct_valid)continue;
       //In CSC offline/hlt software in general, is COUNT FROM ONE, such as CSCGeometry.
       //However, the LCT software counts from zero. strip_id is from 0 to 159. wireGroup_id is from 0 to 79. So here we need to plus one.
-      Int_t wireGroup_id = (*mpcIt).getKeyWG()+1;
-      Float_t strip_id = (*mpcIt).getStrip()/2.+1;
+      Byte_t wireGroup_id = (*mpcIt).getKeyWG()+1;
+      Byte_t strip_id=(*mpcIt).getStrip()/2+1;
       const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer (3)->geometry ();
-      const Int_t Nstrips=layerGeom->numberOfStrips();
-      Bool_t me11a = ( (st == 1) && (id.ring() == 1 || id.ring() == 4) && strip_id>Nstrips );
-      if ( me11a ) strip_id-=Nstrips;
-      for(Int_t ii = 0; ii < 3; ii++){
-	if ( strip_id>Nstrips ) LogWarning("Strip_id") << "Got "<<strip_id<<", but there are "<< Nstrips <<" strips in total." <<m_hlt.process();
-	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(Int_t(strip_id), wireGroup_id);
+      //if ( id.ring()==4 ) cerr<<"Alert id.ring()==4"<<endl;
+      Bool_t me11=(st == 1) && (id.ring() == 1 || id.ring() == 4),
+	me11a = me11 && strip_id>64;
+	//me11b = me11 && strip_id<=64;
+      //http://cmssdt.cern.ch/SDT/lxr/source/CondFormats/CSCObjects/src/CSCChannelTranslator.cc
+      // Translate a raw strip channel in range 1-80, iraw,  into 
+      // corresponding geometry-oriented channel in which increasing
+      // channel number <-> strip number increasing with +ve local x.
+      //geomStripChannel( CSCDetId(ec, st+1, rg,  CSCChCand[st], 0) )
+      if ( me11a ) {
+	strip_id-=64;
+	if ( id.endcap()==1 ) strip_id=17-strip_id;
+      }
+      //if ( me11b && id.endcap()!=1 ) strip_id=65-strip_id;
+      for(Byte_t ii = 0; ii < 3; ii++){
+	// if ( strip_id>64 ) LogWarning("Strip_id") << "Got "<<strip_id<<", but there are "<< Nstrips <<" strips in total." <<m_hlt.process();
+	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(strip_id, wireGroup_id);
 	//	printf( "ME%d/%d: %.1f/%d, %d/%d: xLCT-xTT=%.2f-%.2f; yLCT-yTT=%.2f-%.2f \n",st,id.ring(),strip_id,Nstrips,wireGroup_id,layerGeom->numberOfWireGroups(),interSect_.x(),xPos,interSect_.y(),yPos);
 	Float_t DeltaR_ = sqrt(pow((interSect_.x()-xPos),2) + pow((interSect_.y()-yPos),2));
 	if( DeltaR_ < fabs(dRTrkLCT) ) {
@@ -1517,7 +1554,7 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
 	  else rg=id.ring();
 	  //cout << "1: BX = " << (*mpcIt).getBX() << " BX0 = " << (*mpcIt).getBX0() << std::endl;
 	} // for the matching if statement...
-	if (me11a) strip_id+=16.;
+	if (me11a) strip_id+=16;
 	else break;
       }// end iteration over of ME11A triplet
     }// end iteration over lcts_mpc_data in one chamber
@@ -1757,7 +1794,7 @@ void TPTrackMuonSys::getCSCSegWkeyHalfStrip(const vector<CSCRecHit2D> &theseRecH
 #endif
 }
 #endif// end of GetCSCHitsBefore500
-
+/*
 Bool_t TPTrackMuonSys::matchCSCSegWithLCT(edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, 
 					  CSCDetId & idCSC, 
 					  Int_t TT,
@@ -1877,7 +1914,7 @@ Bool_t TPTrackMuonSys::matchCSCSegWithLCT(edm::Handle<CSCCorrelatedLCTDigiCollec
   }// end iteration over lcts_mpc_data
   return (xMatch[0] || xMatch[1]);
 } 
-
+*/
 void TPTrackMuonSys::chamberCandidates(Int_t station, Float_t feta, Float_t phi, std::vector <int> &coupleOfChambers){
   // yeah, hardcoded again...
   coupleOfChambers.clear();
@@ -1911,66 +1948,63 @@ void TPTrackMuonSys::chamberCandidates(Int_t station, Float_t feta, Float_t phi,
 
 
 Int_t TPTrackMuonSys::ringCandidate(Int_t station, Float_t feta, Float_t phi){
-  // yeah, hardcoded again...
-
-  Int_t ring = -9999;
-
   switch (station){
   case 1:
     if(fabs(feta)>=0.85 && fabs(feta)<1.18){//ME13
-      ring = 3;
+      return 3;
     }      
     if(fabs(feta)>=1.18 && fabs(feta)<=1.5){//ME12 if(fabs(feta)>1.18 && fabs(feta)<1.7){//ME12
-      ring = 2;
+      return 2;
     }
     if(fabs(feta)>1.5 && fabs(feta)<2.1){//ME11
-      ring = 1;
+      return 1;
     }
-    if(fabs(feta)>=2.1 && fabs(feta)<2.5){//ME11
-      ring = 4;
+    if(fabs(feta)>=2.1 && fabs(feta)<2.45){//ME11
+      return 4;
     }
     break;
   case 2:
     if(fabs(feta)>0.95 && fabs(feta)<1.6){//ME22
-      ring = 2;      
+      return 2;      
     }  
-    if(fabs(feta)>1.55 && fabs(feta)<2.5){//ME21
-      ring = 1;      
+    if(fabs(feta)>1.55 && fabs(feta)<2.45){//ME21
+      return 1;      
     }
     break;
   case 3:
     if(fabs(feta)>1.08 && fabs(feta)<1.72){//ME32
-      ring = 2;            
+      return 2;            
     }  
-    if(fabs(feta)>1.69 && fabs(feta)<2.5){//ME31
-      ring = 1; 
+    if(fabs(feta)>1.69 && fabs(feta)<2.45){//ME31
+      return 1; 
     }
     break;
   case 4:
-    if(fabs(feta)>1.78 && fabs(feta) <2.5){//ME41
-      ring = 1; 
+    if(fabs(feta)>1.78 && fabs(feta) <2.45){//ME41
+      return 1; 
     }
     if(fabs(feta)>1.15 && fabs(feta) <=1.78){//ME42
-      ring = 2; 
+      return 2; 
     }
     break;
   default:
     LogError("")<<"Invalid station: "<<station<<endl;
     break;
   }
-  return ring;
+  return -9999;
 }
 
 Short_t TPTrackMuonSys::thisChamberCandidate(Short_t station, Short_t ring, Float_t phi){
   //search for chamber candidate based on CMS IN-2007/024
   //10 deg chambers are ME1,ME22,ME32,ME42 chambers; 20 deg chambers are ME21,31,41 chambers
-  //Chambers one always starts from approx -5 deg. The following phis are center lines, so 20 deg chambers shifts 5 deg.
+  //Chambers one always starts from approx -5 deg.
   const Short_t nVal = (station>1 && ring == 1)?18:36;
   const Float_t ChamberSpan=2*M_PI/nVal;
-  double dphi = phi + M_PI/36;
-  while (dphi > 2*M_PI) dphi -= 2*M_PI;
+  Float_t dphi = phi + M_PI/36;
+  while (dphi >= 2*M_PI) dphi -= 2*M_PI;
   while (dphi < 0) dphi += 2*M_PI;
-  return Int_t(dphi/ChamberSpan)+1;
+  Short_t ChCand=floor(dphi/ChamberSpan)+1;
+  return ChCand>nVal?nVal:ChCand;
 }
 
 ///////////////////////
@@ -2309,25 +2343,25 @@ TPTrackMuonSys::MCParticleInfo TPTrackMuonSys::MCParticleInfo_Creator( const Sim
   return TBA;
 }
 
-//deadzone center is according to http://cmslxr.fnal.gov/lxr/source/RecoLocalMuon/CSCEfficiency/src/CSCEfficiency.cc#605
+//deadzone center is according to http://cmssdt.cern.ch/SDT/lxr/source/RecoLocalMuon/CSCEfficiency/src/CSCEfficiency.cc#605
 //wire spacing is according to CSCTDR
 Float_t TPTrackMuonSys::YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing){
-  const Float_t deadZoneCenterME1_14[2] = {-81.0,81.0};
-  const Float_t deadZoneCenterME1_2[4] = {-86.285,-32.88305,32.867423,88.205};
-  const Float_t deadZoneCenterME1_3[4] = {-83.155,-22.7401,27.86665,81.005};
-  const Float_t deadZoneCenterME2_1[4] = {-95.94,-27.47,33.67,93.72};
-  const Float_t deadZoneCenterME3_1[4] = {-85.97,-36.21,23.68,84.04};
-  const Float_t deadZoneCenterME4_1[4] = {-75.82,-26.14,23.85,73.91};
-  const Float_t deadZoneCenterME234_2[6] = {-162.48,-81.8744,-21.18165,39.51105,100.2939,160.58};
+  //the ME11 wires are not parallel to x, but no gap
+  //chamber edges are not included.
+  const Float_t deadZoneCenterME1_2[2] = {-32.88305,32.867423};
+  const Float_t deadZoneCenterME1_3[2] = {-22.7401,27.86665};
+  const Float_t deadZoneCenterME2_1[2] = {-27.47,33.67};
+  const Float_t deadZoneCenterME3_1[2] = {-36.21,23.68};
+  const Float_t deadZoneCenterME4_1[2] = {-26.14,23.85};
+  const Float_t deadZoneCenterME234_2[4] = {-81.8744,-21.18165,39.51105,100.2939};
   const Float_t *deadZoneCenter;
-  Float_t deadZoneHeightHalf=2.53/2.,minY=999999.;
-  Byte_t nGaps=4;
+  Float_t deadZoneHeightHalf=0.32*7/2;// wire spacing * (wires missing + 1)/2
+  Float_t minY=999999.;
+  Byte_t nGaps=2;
   switch (abs(StationAndRing)) {
   case 11:
   case 14:
-    deadZoneCenter=deadZoneCenterME1_14;
-    deadZoneHeightHalf=2/2.;
-    nGaps=2;
+    return 162;//the height of ME11
     break;
   case 12:
     deadZoneCenter=deadZoneCenterME1_2;
@@ -2337,19 +2371,16 @@ Float_t TPTrackMuonSys::YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing){
     break;
   case 21:
     deadZoneCenter=deadZoneCenterME2_1;
-    deadZoneHeightHalf=2.5/2.;
     break;
   case 31:
     deadZoneCenter=deadZoneCenterME3_1;
-    deadZoneHeightHalf=2.5/2.;
     break;
   case 41:
     deadZoneCenter=deadZoneCenterME4_1;
-    deadZoneHeightHalf=2.5/2.;
     break;
   default:
     deadZoneCenter=deadZoneCenterME234_2;
-    nGaps=6;
+    nGaps=4;
   }
   for ( Byte_t iGap=0;iGap<nGaps;iGap++ ) {
     Float_t newMinY=yLocal<deadZoneCenter[iGap]?deadZoneCenter[iGap]-deadZoneHeightHalf-yLocal:yLocal-(deadZoneCenter[iGap]+deadZoneHeightHalf);
