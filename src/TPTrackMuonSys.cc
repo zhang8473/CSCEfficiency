@@ -1111,10 +1111,11 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	    CSCdYdZTTSeg[st] = dydz_trk - dydz_seg;
 	  }
 	  nTrkCountCSCSeg++;
+	  delete TrajToSeg;
 	}
 
        	////// Loop over MPC infromation to look for LCTs....
-	CSCDetId Layer3id  = CSCDetId( ec, st+1, rg,  CSCChCand[st], 3 );//go to layer 3 where corresponds to the LCTPos
+	CSCDetId Layer3id  = CSCDetId( ec, st+1, rg,  CSCChCand[st], 3 );//go to layer 3 that corresponds to the LCTPos
 	const GeomDet* Layer3gdet=cscGeom->idToDet(Layer3id);
 	tsos=surfExtrapTrkSam(trackRef, Layer3gdet->surface().position().z());
 	if (tsos.isValid()) {
@@ -1129,6 +1130,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	    LocalError localTTErr =tsos.localError().positionError();
 	    CSCDxErrTTLCT[st] = sqrt(localTTErr.xx()); CSCDyErrTTLCT[st] = sqrt(localTTErr.yy());
 	    CSCDxyErrTTLCT[st] =sqrt(pow(CSCDxTTLCT[st],2)*localTTErr.xx() + pow(CSCDyTTLCT[st],2)*localTTErr.yy())/CSCDxyTTLCT[st];
+	    delete LCTPos;
 	    //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
  	  }//end of if found LCT
 	}//end of if layer 3 extrapolation is available
@@ -1325,7 +1327,7 @@ vector<Float_t> TPTrackMuonSys::GetEdgeAndDistToGap(reco::TrackRef trackRef, CSC
   TrajectoryStateOnSurface tsos=surfExtrapTrkSam(trackRef, gdet->surface().position().z());
   if (!tsos.isValid()) return result;
   LocalPoint localTTPos = gdet->surface().toLocal(tsos.freeState()->position());
-  const CSCWireTopology* wireTopology = cscGeom->chamber(detid)->layer(detid.layer())->geometry()->wireTopology();
+  const CSCWireTopology* wireTopology = cscGeom->layer(detid)->geometry()->wireTopology();
   Float_t wideWidth      = wireTopology->wideWidthOfPlane();
   Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
   Float_t length         = wireTopology->lengthOfPlane();
@@ -1523,7 +1525,7 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       Bool_t lct_valid = (*mpcIt).isValid();
       if(!lct_valid)continue;
       //In CSC offline/hlt software in general, is COUNT FROM ONE, such as CSCGeometry.
-      //However, the LCT software counts from zero. strip_id is from 0 to 159. wireGroup_id is from 0 to 79. So here we need to plus one.
+      //However, the LCT software counts from zero. strip_id is from 0 to 159. wireGroup_id is from 0 to 31(ME13),47(ME11),63(ME1234/2),95(ME31,41),111(ME21). So here we need to plus one.
       Byte_t wireGroup_id = (*mpcIt).getKeyWG()+1;
       Byte_t strip_id=(*mpcIt).getStrip()/2+1;
       const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer (3)->geometry ();
@@ -1538,7 +1540,7 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       //geomStripChannel( CSCDetId(ec, st+1, rg,  CSCChCand[st], 0) )
       if ( me11a ) {
 	strip_id-=64;
-	if ( id.endcap()==1 ) strip_id=17-strip_id;
+	//if ( id.endcap()==1 ) strip_id=17-strip_id;
       }
       //if ( me11b && id.endcap()!=1 ) strip_id=65-strip_id;
       for(Byte_t ii = 0; ii < 3; ii++){
@@ -1547,6 +1549,7 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
 	//	printf( "ME%d/%d: %.1f/%d, %d/%d: xLCT-xTT=%.2f-%.2f; yLCT-yTT=%.2f-%.2f \n",st,id.ring(),strip_id,Nstrips,wireGroup_id,layerGeom->numberOfWireGroups(),interSect_.x(),xPos,interSect_.y(),yPos);
 	Float_t DeltaR_ = sqrt(pow((interSect_.x()-xPos),2) + pow((interSect_.y()-yPos),2));
 	if( DeltaR_ < fabs(dRTrkLCT) ) {
+	  delete interSect;
 	  interSect=new LocalPoint(interSect_);
 	  dRTrkLCT =  DeltaR_ ;
 	  lctBX = (*mpcIt).getBX();
@@ -1594,6 +1597,7 @@ TrajectoryStateOnSurface *TPTrackMuonSys::matchTTwithCSCSeg( reco::TrackRef trac
 
     Float_t dR_= fabs( TrajectoryDistToSeg( &TrajSuf_, segIt ) );
     if ( dR_ < deltaCSCR ){
+      delete TrajSuf;
       TrajSuf=new TrajectoryStateOnSurface(TrajSuf_);
       deltaCSCR = dR_;
       cscSegOut = segIt;
