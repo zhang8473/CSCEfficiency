@@ -300,8 +300,8 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 #ifdef m_debug
   //describe the chamber active region outline
   if (nEventsAnalyzed==1) {
-    Short_t rings[]={11,14,12,13,21,31,41,22};
-    for (Byte_t iring=0;iring<8;iring++) {
+    Short_t rings[]={11,14,12};//,12,13,21,31,41,22};
+    for (Byte_t iring=0;iring<3;iring++) {
       CSCDetId id=CSCDetId(1, rings[iring]/10, rings[iring]%10, 1, 1);
       printf("============ ME%d chamber outline=============\n",rings[iring]);
       const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer(1)->geometry ();
@@ -316,9 +316,16 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
       printf("(strip 1, wire group %d) at (%.3f,%.3f)\n", NWires,interSect_.x(),interSect_.y());
       printf("   ======== middle x of wires(check)==========\n");
       const CSCWireTopology* wireTopology = layerGeom->wireTopology();
-      for (Short_t wireGroup_id=1;wireGroup_id<=NWires;wireGroup_id+=(NWires-1)/3) {
-	printf("x center of wire %d is at %.3f\n",wireGroup_id,wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id))[0]);
+      for (Short_t wireGroup_id=10;wireGroup_id<=15;wireGroup_id++) {
+	Float_t wideWidth      = wireTopology->wideWidthOfPlane();
+	Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
+	Float_t length         = wireTopology->lengthOfPlane();
+	Float_t tangent = (wideWidth-narrowWidth)/(2.*length);
+	Float_t wireangle= wireTopology->wireAngle();
+	std::vector<float> wirecenters=wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id));
+	printf("x center of wire %d is at %.3f=%.3f\n",wireGroup_id,wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id))[0],wirecenters[2]*sin(wireangle)*tangent/2);
       }
+      printf("y center of the wires is at %.3f\n",wireTopology->yOfWire(1)+0.5*wireTopology->lengthOfPlane());
     }
   }
 #endif
@@ -1342,6 +1349,7 @@ vector<Float_t> TPTrackMuonSys::GetEdgeAndDistToGap(reco::TrackRef trackRef, CSC
   // half trapezoid width at y' is 0.5 * narrowWidth + x side of triangle with the above tangent and side y'
   Float_t halfWidthAtYPrime = 0.5*narrowWidth+yPrime*tangent;
   // x offset between local origin and symmetry center of wire plane is zero
+  // x offset of ME11s is also zero. x center of wire groups is not at zero, because it is not parallel to x. The wire groups of ME11s have a complex geometry, see the code in m_debug.
   Float_t edgex = fabs(localTTPos.x()) - halfWidthAtYPrime;
   Float_t edgey = fabs(localTTPos.y()-yCOWPOffset) - 0.5*length;
   LocalError localTTErr = tsos.localError().positionError();
@@ -1510,7 +1518,7 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
   
   for (CSCCorrelatedLCTDigiCollection::DigiRangeIterator detMPCUnitIt = mpclcts->begin(); 
        detMPCUnitIt != mpclcts->end(); detMPCUnitIt++) {
-    const CSCDetId& id = (*detMPCUnitIt).first;
+    CSCDetId id = (*detMPCUnitIt).first;
     
     if(ec != id.endcap())continue;
     if(st != id.station())continue;
@@ -1528,7 +1536,6 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       //However, the LCT software counts from zero. strip_id is from 0 to 159. wireGroup_id is from 0 to 31(ME13),47(ME11),63(ME1234/2),95(ME31,41),111(ME21). So here we need to plus one.
       Byte_t wireGroup_id = (*mpcIt).getKeyWG()+1;
       Byte_t strip_id=(*mpcIt).getStrip()/2+1;
-      const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer (3)->geometry ();
       //if ( id.ring()==4 ) cerr<<"Alert id.ring()==4"<<endl;
       Bool_t me11=(st == 1) && (id.ring() == 1 || id.ring() == 4),
 	me11a = me11 && strip_id>64;
@@ -1540,9 +1547,13 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       //geomStripChannel( CSCDetId(ec, st+1, rg,  CSCChCand[st], 0) )
       if ( me11a ) {
 	strip_id-=64;
+	// The CSCCorrelatedLCTDigi DetId does NOT distinguish ME11A and B. All of the DetIDs are labelled as ME11B (all ME11, none ME14)
+	// However, stripWireGroupIntersection must know that since ME11A has 48 strips and ME11B has 64.
+	id=CSCDetId(ec, 1, 4, cham, 3);
 	//if ( id.endcap()==1 ) strip_id=17-strip_id;
       }
       //if ( me11b && id.endcap()!=1 ) strip_id=65-strip_id;
+      const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer (3)->geometry ();
       for(Byte_t ii = 0; ii < 3; ii++){
 	// if ( strip_id>64 ) LogWarning("Strip_id") << "Got "<<strip_id<<", but there are "<< Nstrips <<" strips in total." <<m_hlt.process();
 	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(strip_id, wireGroup_id);
