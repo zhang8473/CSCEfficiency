@@ -297,36 +297,38 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   // setup.get<MuonGeometryRecord>().get(dtGeom);
 
   setup.get<MuonGeometryRecord>().get(cscGeom);
+//#define m_debug
 #ifdef m_debug
-  //describe the chamber active region outline
+  //check the chamber active region geometry and numbering --- something good to know
   if (nEventsAnalyzed==1) {
-    Short_t rings[]={11,14,12};//,12,13,21,31,41,22};
-    for (Byte_t iring=0;iring<3;iring++) {
-      CSCDetId id=CSCDetId(1, rings[iring]/10, rings[iring]%10, 1, 1);
-      printf("============ ME%d chamber outline=============\n",rings[iring]);
-      const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer(1)->geometry ();
-      const Byte_t NStrips=layerGeom->numberOfStrips(),NWires=layerGeom->numberOfWireGroups();
-      LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(1, 1);
-      printf("(strip 1, wire group 1) at (%.3f,%.3f)\n",interSect_.x(),interSect_.y());
-      interSect_ = layerGeom->stripWireGroupIntersection(NStrips, 1);
-      printf("(strip %d, wire group 1) at (%.3f,%.3f)\n",NStrips,interSect_.x(),interSect_.y());
-      interSect_ = layerGeom->stripWireGroupIntersection(NStrips, NWires);
-      printf("(strip %d, wire group %d) at (%.3f,%.3f)\n",NStrips, NWires,interSect_.x(),interSect_.y());
-      interSect_ = layerGeom->stripWireGroupIntersection(1, NWires);
-      printf("(strip 1, wire group %d) at (%.3f,%.3f)\n", NWires,interSect_.x(),interSect_.y());
-      printf("   ======== middle x of wires(check)==========\n");
-      const CSCWireTopology* wireTopology = layerGeom->wireTopology();
-      for (Short_t wireGroup_id=10;wireGroup_id<=15;wireGroup_id++) {
-	Float_t wideWidth      = wireTopology->wideWidthOfPlane();
-	Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
-	Float_t length         = wireTopology->lengthOfPlane();
-	Float_t tangent = (wideWidth-narrowWidth)/(2.*length);
-	Float_t wireangle= wireTopology->wireAngle();
-	std::vector<float> wirecenters=wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id));
-	printf("x center of wire %d is at %.3f=%.3f\n",wireGroup_id,wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id))[0],wirecenters[2]*sin(wireangle)*tangent/2);
+    Short_t rings[]={11,12,21,31,41,22};//,14,12,13,21,31,41,22};
+    for (Byte_t iendcap=1;iendcap<3;iendcap++) 
+      for (Byte_t iring=0;iring<sizeof(rings)/sizeof(Short_t);iring++) {
+	CSCDetId id=CSCDetId(iendcap, rings[iring]/10, rings[iring]%10, 1, 1);
+	printf("============ ME%c%d chamber outline=============\n",iendcap==1?'+':'-',rings[iring]);
+	const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer(1)->geometry ();
+	const Byte_t NStrips=layerGeom->numberOfStrips(),NWires=layerGeom->numberOfWireGroups();
+	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(1, 5);
+	printf("(strip 1, wire group 5) at (%.3f,%.3f)\n",interSect_.x(),interSect_.y());
+	interSect_ = layerGeom->stripWireGroupIntersection(NStrips, 5);
+	printf("(strip %d, wire group 5) at (%.3f,%.3f)\n",NStrips,interSect_.x(),interSect_.y());
+	interSect_ = layerGeom->stripWireGroupIntersection(NStrips, NWires);
+	printf("(strip %d, wire group %d) at (%.3f,%.3f)\n",NStrips, NWires,interSect_.x(),interSect_.y());
+	interSect_ = layerGeom->stripWireGroupIntersection(1, NWires);
+	printf("(strip 1, wire group %d) at (%.3f,%.3f)\n", NWires,interSect_.x(),interSect_.y());
+	printf("   ======== middle x of wires(check)==========\n");
+	const CSCWireTopology* wireTopology = layerGeom->wireTopology();
+	for (Short_t wireGroup_id=10;wireGroup_id<=15;wireGroup_id++) {
+	  Float_t wideWidth      = wireTopology->wideWidthOfPlane();
+	  Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
+	  Float_t length         = wireTopology->lengthOfPlane();
+	  Float_t tangent = (wideWidth-narrowWidth)/(2.*length);
+	  Float_t wireangle= wireTopology->wireAngle();
+	  std::vector<float> wirecenters=wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id));
+	  printf("x center of wire %d is at %.3f=%.3f\n",wireGroup_id,wireTopology->wireValues(wireTopology->middleWireOfGroup(wireGroup_id))[0],wirecenters[2]*sin(wireangle)*tangent/2);
+	}
+	printf("y center of the wires is at %.3f\n",wireTopology->yOfWire(1)+0.5*wireTopology->lengthOfPlane());
       }
-      printf("y center of the wires is at %.3f\n",wireTopology->yOfWire(1)+0.5*wireTopology->lengthOfPlane());
-    }
   }
 #endif
   // Get the propagators
@@ -1133,7 +1135,6 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	    CSCLCTyLc[st]=LCTPos->y();
 	    CSCDxTTLCT[st]=CSCLCTxLc[st]-localL3pCSC.x();
 	    CSCDyTTLCT[st]=CSCLCTyLc[st]-localL3pCSC.y();
-	    CSCDxyTTLCT[st] = sqrt(pow(CSCDxTTLCT[st],2)+pow(CSCDyTTLCT[st],2));
 	    LocalError localTTErr =tsos.localError().positionError();
 	    CSCDxErrTTLCT[st] = sqrt(localTTErr.xx()); CSCDyErrTTLCT[st] = sqrt(localTTErr.yy());
 	    CSCDxyErrTTLCT[st] =sqrt(pow(CSCDxTTLCT[st],2)*localTTErr.xx() + pow(CSCDyTTLCT[st],2)*localTTErr.yy())/CSCDxyTTLCT[st];
@@ -1539,12 +1540,12 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       //if ( id.ring()==4 ) cerr<<"Alert id.ring()==4"<<endl;
       Bool_t me11=(st == 1) && (id.ring() == 1 || id.ring() == 4),
 	me11a = me11 && strip_id>64;
-	//me11b = me11 && strip_id<=64;
+      //me11b = me11 && strip_id<=64;
       //http://cmssdt.cern.ch/SDT/lxr/source/CondFormats/CSCObjects/src/CSCChannelTranslator.cc
-      // Translate a raw strip channel in range 1-80, iraw,  into 
-      // corresponding geometry-oriented channel in which increasing
-      // channel number <-> strip number increasing with +ve local x.
-      //geomStripChannel( CSCDetId(ec, st+1, rg,  CSCChCand[st], 0) )
+      //Translate a raw strip channel in range 1-80, iraw,  into corresponding geometry-oriented channel in which increasing
+      //channel number <-> strip number increasing with +ve local x.
+      //However, the LCT firmwire has already done the number flipping but it numbers ME11B strips from  0 to 63, ME11A strips from 64-79. (confirmed by Slava)
+      //That is the reason we commented out the following number flipping codes.
       if ( me11a ) {
 	strip_id-=64;
 	// The CSCCorrelatedLCTDigi DetId does NOT distinguish ME11A and B. All of the DetIDs are labelled as ME11B (all ME11, none ME14)
