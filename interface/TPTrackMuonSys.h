@@ -53,6 +53,7 @@
 #include "CalibMuon/CSCCalibration/interface/CSCConditions.h"
 #include "CondFormats/CSCObjects/interface/CSCBadChambers.h"
 #include "CondFormats/DataRecord/interface/CSCBadChambersRcd.h"
+//#include "CondFormats/CSCObjects/interface/CSCChannelTranslator.h"
 
 /*CSC-LCT*/
 #include "DataFormats/CSCDigi/interface/CSCCorrelatedLCTDigi.h"
@@ -216,14 +217,14 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   
   void chamberCandidates(Int_t station, Float_t feta, Float_t phi, std::vector <int> &coupleOfChambers);
   Int_t ringCandidate(Int_t station, Float_t feta, Float_t phi);
-  Short_t thisChamberCandidate(Short_t station, Short_t ring, Float_t phi);
+  UChar_t thisChamberCandidate(UChar_t station, UChar_t ring, Float_t phi);
 
   ///// Functions needed...
   void getCSCSegWkeyHalfStrip(const std::vector<CSCRecHit2D> &theseRecHits, Float_t &cStrp, Float_t &ckWG);
   
   Float_t YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing);
 
-  vector<Float_t> GetEdgeAndDistToGap(reco::TrackRef trackRef, CSCDetId & detid);
+  inline vector<Float_t> GetEdgeAndDistToGap(reco::TrackRef trackRef, CSCDetId & detid);
 
   reco::MuonCollection::const_iterator matchTTwithMT(reco::TrackCollection::const_iterator &itrack);
 
@@ -235,14 +236,13 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
 			    std::vector<CSCRecHit2D> &recHitOut, 
 			    std::vector<Int_t > &deltaRecHitX,
 			    std::vector<Int_t > &deltaRecHitY);
-  
-
+  /*  
   bool matchTTwithRPCEChit(bool trackDir, 
 			   Int_t j, 
 			   reco::TrackRef trackRef, 
 			   edm::Handle<RPCRecHitCollection> rpcRecHits, 
 			   RPCRecHitCollection::const_iterator &rpcHitOut);
-
+  */
   inline Float_t TrajectoryDistToSeg( TrajectoryStateOnSurface *TrajSuf, CSCSegmentCollection::const_iterator segIt);
  
   TrajectoryStateOnSurface* matchTTwithCSCSeg( reco::TrackRef trackRef, edm::Handle<CSCSegmentCollection> cscSegments, 
@@ -251,7 +251,7 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Bool_t matchTTwithCSCSeg(Bool_t trackDir, Int_t j, reco::TrackRef trackRef, edm::Handle<CSCSegmentCollection> cscSegments, 
 			   CSCSegmentCollection::const_iterator &cscSegOut );
 
-
+/*
   Bool_t matchCSCSegWithLCT(edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, 
 			    CSCDetId & idCSC, 
 			    Int_t TT,
@@ -266,8 +266,8 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
 			    Float_t *delHStrp,
 			    Float_t *delWkey
 			    );
-
-  LocalPoint * matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t &rg, Short_t cham, 
+*/
+  LocalPoint * matchTTwithLCTs(Float_t xPos, Float_t yPos, UChar_t ec, UChar_t st, UChar_t &rg, UChar_t cham, 
 			       edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, Float_t &dRTrkLCT, Int_t &lctBX );
 
   Int_t getNLayerMatchedCSCSeg(CSCSegmentCollection::const_iterator &cscSegMatch,
@@ -283,9 +283,12 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   edm::Handle<reco::MuonCollection> muons;
   edm::ESHandle<MagneticField> theBField;
   //edm::ESHandle<GlobalTrackingGeometry> theTrackingGeometry;
+  /*
   // DT Geometry
-  //edm::ESHandle<DTGeometry> dtGeom;
+  edm::ESHandle<DTGeometry> dtGeom;
+  //RPC Geometry
   edm::ESHandle<RPCGeometry> rpcGeo;
+  */
   // CSC Geometry
   edm::ESHandle<CSCGeometry> cscGeom;
 
@@ -371,10 +374,10 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Float_t tracks_qoverpError, tracks_ptError, tracks_thetaError, tracks_lambdaError;
   Float_t tracks_etaError, tracks_phiError, tracks_dxyError, tracks_d0Error , tracks_dszError;
   Float_t tracks_dzError;
-  Bool_t tracks_isCaloMuTrk,tracks_isTrackerMuTrk,trackVeto;
+  Bool_t tracks_isCaloMuTrk,tracks_isTrackerMuTrk,trackVeto_strict,trackVeto_isClosestToLCT;
 
-  Int_t nPosTrk, nNegTrk, nTotalTrks;
-  ///
+  Int_t nTotalTrks;//nPosTrk, nNegTrk
+  
   Int_t myRegion;// 1-DT, 2-DT&CSC 3-CSC;
 
   Int_t mpc_endcap, mpc_ring, mpc_station, mpc_chamber;
@@ -414,7 +417,7 @@ class TPTrackMuonSys : public edm::EDAnalyzer {
   Int_t nTrkCountCSCSeg;
   /*CSC Chamber Candidates in each station*/
   Bool_t CSCEndCapPlus;
-  Short_t CSCRg[4],CSCChCand[4];
+  UChar_t CSCRg[4],CSCChCand[4];
   Bool_t CSCChBad[4];
   
   /*Extrapolated Tracks on CSC Chamber Candidates in each station*/

@@ -302,9 +302,9 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 #ifdef m_debug
   //check the chamber active region geometry and numbering --- something good to know
   if (nEventsAnalyzed==1) {
-    Short_t rings[]={11,12,21,31,41,22};//,14,12,13,21,31,41,22};
+    UChar_t rings[]={11,12,21,31,41,22};//,14,12,13,21,31,41,22};
     for (UChar_t iendcap=1;iendcap<3;iendcap++) 
-      for (UChar_t iring=0;iring<sizeof(rings)/sizeof(Short_t);iring++) {
+      for (UChar_t iring=0;iring<sizeof(rings)/sizeof(UChar_t);iring++) {
 	CSCDetId id=CSCDetId(iendcap, rings[iring]/10, rings[iring]%10, 1, 1);
 	printf("============ ME%c%d chamber outline=============\n",iendcap==1?'+':'-',rings[iring]);
 	const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer(1)->geometry ();
@@ -319,7 +319,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	printf("(strip 1, wire group %d) at (%.3f,%.3f)\n", NWires,interSect_.x(),interSect_.y());
 	printf("   ======== middle x of wires(check)==========\n");
 	const CSCWireTopology* wireTopology = layerGeom->wireTopology();
-	for (Short_t wireGroup_id=10;wireGroup_id<=15;wireGroup_id++) {
+	for (UChar_t wireGroup_id=10;wireGroup_id<=15;wireGroup_id++) {
 	  Float_t wideWidth      = wireTopology->wideWidthOfPlane();
 	  Float_t narrowWidth    = wireTopology->narrowWidthOfPlane();
 	  Float_t length         = wireTopology->lengthOfPlane();
