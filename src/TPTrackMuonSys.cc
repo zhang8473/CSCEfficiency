@@ -104,12 +104,13 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
   fractNtuple->Branch("numberOfPrimaryVertices" , &numberOfPrimaryVertices , "numberOfPrimaryVertices/i"); 
   fractNtuple->Branch("trgSingle",       &trgSingle,"trgSingle/O") ;
   fractNtuple->Branch("nTrkCountCSCSeg",    &nTrkCountCSCSeg,   "nTrkCountCSCSeg/I") ;
-  //  fractNtuple->Branch("nTrkCountRPCE",    &nTrkCountRPCE,   "nTrkCountRPCE/I") ;
+  //fractNtuple->Branch("nTrkCountRPCE",    &nTrkCountRPCE,   "nTrkCountRPCE/I") ;
   //fractNtuple->Branch("nTrkCountEC",       &nTrkCountEC,      "nTrkCountEC/I") ;
-  fractNtuple->Branch("nPosTrk",       &nPosTrk,      "nPosTrk/I") ;
-  fractNtuple->Branch("nNegTrk",       &nNegTrk,   "nNegTrk/I") ;
+  //fractNtuple->Branch("nPosTrk",       &nPosTrk,      "nPosTrk/I") ;
+  //bin/fractNtuple->Branch("nNegTrk",       &nNegTrk,   "nNegTrk/I") ;
   fractNtuple->Branch("nTotalTrks",       &nTotalTrks,      "nTotalTrks/I") ;
-  fractNtuple->Branch("trackVeto",       &trackVeto,      "trackVeto/O") ;
+  fractNtuple->Branch("trackVeto_strict",       &trackVeto_strict,      "trackVeto_strict/O") ;//strick track veto: if two tracks are expected to pass one chamber, veto both (value=true).
+  fractNtuple->Branch("trackVeto_isClosestToLCT",       &trackVeto_isClosestToLCT,      "trackVeto_isClosestToLCT/O") ;//if there is a track closer to the LCT of the chamber, veto the further ones (value=true).
   fractNtuple->Branch("myRegion",           &myRegion,           "myRegion/I") ;
   fractNtuple->Branch("MuTagPt",         &MuTagPt,         "MuTagPt/F") ;
   fractNtuple->Branch("MuTagEta",        &MuTagEta,        "MuTagEta/F") ;
@@ -186,8 +187,8 @@ TPTrackMuonSys::TPTrackMuonSys(const edm::ParameterSet& Conf) : theDbConditions(
   for (Short_t st=0;st<4;st++) {
     char BranchName[30],BranchTitle[30];
     /*CSC Chamber Candidates in each station*/
-    MakeBranchAllSt("CSCRg","S",CSCRg);
-    MakeBranchAllSt("CSCCh","S",CSCChCand);
+    MakeBranchAllSt("CSCRg","b",CSCRg);
+    MakeBranchAllSt("CSCCh","b",CSCChCand);
     MakeBranchAllSt("CSCCBad","O",CSCChBad);
 
     /*Extrapolated Tracks on CSC Chamber Candidates in each station*/
@@ -302,12 +303,12 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
   //check the chamber active region geometry and numbering --- something good to know
   if (nEventsAnalyzed==1) {
     Short_t rings[]={11,12,21,31,41,22};//,14,12,13,21,31,41,22};
-    for (Byte_t iendcap=1;iendcap<3;iendcap++) 
-      for (Byte_t iring=0;iring<sizeof(rings)/sizeof(Short_t);iring++) {
+    for (UChar_t iendcap=1;iendcap<3;iendcap++) 
+      for (UChar_t iring=0;iring<sizeof(rings)/sizeof(Short_t);iring++) {
 	CSCDetId id=CSCDetId(iendcap, rings[iring]/10, rings[iring]%10, 1, 1);
 	printf("============ ME%c%d chamber outline=============\n",iendcap==1?'+':'-',rings[iring]);
 	const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer(1)->geometry ();
-	const Byte_t NStrips=layerGeom->numberOfStrips(),NWires=layerGeom->numberOfWireGroups();
+	const UChar_t NStrips=layerGeom->numberOfStrips(),NWires=layerGeom->numberOfWireGroups();
 	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(1, 5);
 	printf("(strip 1, wire group 5) at (%.3f,%.3f)\n",interSect_.x(),interSect_.y());
 	interSect_ = layerGeom->stripWireGroupIntersection(NStrips, 5);
@@ -543,84 +544,76 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 #endif
 
   Int_t trackNumber[2][4][4][36];
+  Int_t BestTrkWithLCT[2][4][4][36];
+  Float_t CloestDisTrkLCT[2][4][4][36];
   Bool_t trkVeto[MAXNTRACKS];
 
-  for(Int_t i1 = 0; i1 < 2; i1++)
-    for(Int_t i2 = 0; i2 < 4; i2++)
-      for(Int_t i3 = 0; i3 < 4; i3++)
-	for(Int_t i4 = 0; i4 < 36; i4++)
+  for(UChar_t i1 = 0; i1 < 2; i1++)
+    for(UChar_t i2 = 0; i2 < 4; i2++)
+      for(UChar_t i3 = 0; i3 < 4; i3++)
+	for(UChar_t i4 = 0; i4 < 36; i4++) {
 	  trackNumber[i1][i2][i3][i4] = -1;
-  
-  for(Int_t i1 = 0; i1 < MAXNTRACKS; i1++)
-    trkVeto[i1] = false;
-
-  nPosTrk = 0;
-  nNegTrk = 0;
+	  BestTrkWithLCT[i1][i2][i3][i4] = -1;
+	  CloestDisTrkLCT[i1][i2][i3][i4] = 9999.;
+	}
+ 
   nTotalTrks = gTracks->size();
   for(reco::TrackCollection::const_iterator itTrack = gTracks->begin(); itTrack != gTracks->end(); itTrack++){//start loop tracks
     UInt_t itrk=itTrack - gTracks->begin();
-    if(itTrack->charge() == 0) continue;
-    if(itTrack->p() < 3.0)  continue;
+    trkVeto[ itrk ]=false;
+    if ( itTrack->charge() == 0 ) continue;
+    if ( itTrack->p() < 3.0)  continue;
 
     reco::TrackRef trackRef(gTracks, itrk );
-    tracks_eta    = itTrack->eta(); tracks_phi = itTrack->phi();
-    if(tracks_phi < 0 )tracks_phi = tracks_phi + 2*M_PI;
-    tracks_chi2   = 9999.;
-    if(itTrack->ndof() != 0)tracks_chi2   = itTrack->chi2()/itTrack->ndof();
-    tracks_dxy  = itTrack->dxy(); tracks_dz   = itTrack->dz();
+    Float_t trk_eta = itTrack->eta(),
+      trk_phi = itTrack->phi(),
+      trk_dxy  = itTrack->dxy(),
+      trk_dz   = itTrack->dz(),
+      trk_chi2   = 9999.;
+    while (trk_phi < 0 ) trk_phi = trk_phi + 2*M_PI;
+    if(itTrack->ndof() != 0) trk_chi2   = itTrack->chi2()/itTrack->ndof();
     if(beamExists){
-      tracks_dxy  = itTrack->dxy(beamSpot.position()); 
-      tracks_dz   = itTrack->dz(beamSpot.position());  
+      trk_dxy  = itTrack->dxy(beamSpot.position()); 
+      trk_dz   = itTrack->dz(beamSpot.position());  
     }
+    if ( ! (itTrack->numberOfValidHits()>7  && fabs(trk_dz)<24 && fabs(trk_dxy)< 2.0 && trk_chi2>0 && trk_chi2<4) ) continue;
 
-    tracks_numberOfValidHits = itTrack->numberOfValidHits();
-    if ( ! (tracks_numberOfValidHits>7  && fabs(tracks_dz)<24 && fabs(tracks_dxy)< 2.0 && tracks_chi2>0 && tracks_chi2<4) ) continue;
-    Bool_t ec= ( tracks_eta > 0 );
-    //     if(fabs(tracks_eta) < 1.2 ) trackDT = true;
-    Bool_t GotCSCSegMatched = false;
-    if(fabs(tracks_eta) > 0.9 )//if it is a CSCTrack
-      for(UInt_t j =0; j < 6; j++){//start of matched segments check
-	/* not necessary codes, it will give  the same result
-	   Float_t zzPlaneME = 0.0;
-	   if(trackCSC && MEZ[j] != 0){
-	   zzPlaneME = MEZ[j];
-	   if (!ec) zzPlaneME = -MEZ[j];
-	   TrajectoryStateOnSurface tsos = surfExtrapTrkSam(trackRef, zzPlaneME);  
-	   if (!tsos.isValid()) continue;
-	   Float_t trkEta = tsos.globalPosition().eta(), trkPhi = tsos.globalPosition().phi();
-	   Int_t rg = ringCandidate(j>2?j-1:1, trkEta, trkPhi);
-	   if (rg==0) continue;
-	   if( thisChamberCandidate(st, rg, trkPhi) %2 == 0 ){
-	   zzPlaneME = MEZEven[j];
-	   if(!ec)zzPlaneME = -MEZEven[j];
-	   tsos = surfExtrapTrkSam(trackRef, zzPlaneME);  
-	   }else{
-	   zzPlaneME = MEZOdd[j];
-	   if(!ec)zzPlaneME = -MEZOdd[j];
-	   tsos = surfExtrapTrkSam(trackRef, zzPlaneME); 
-	   }
-	   if (!tsos.isValid())continue;*/
-	CSCSegmentCollection::const_iterator cscSegOut;
-	if( !matchTTwithCSCSeg(ec, j, trackRef, cscSegments,  cscSegOut) ) continue;
-	GotCSCSegMatched=true;
-	CSCDetId id  = (CSCDetId) cscSegOut->cscDetId();		   
-	Byte_t endcapCSC = id.endcap() - 1,ringCSC = id.ring() - 1,stationCSC = id.station() - 1,chamberCSC = id.chamber() - 1;
- 	if ( trackNumber[endcapCSC][stationCSC][ringCSC][chamberCSC] < 0 )
-	  trackNumber[endcapCSC][stationCSC][ringCSC][chamberCSC] =  itrk;
+    Bool_t ec= ( trk_eta > 0 );
+    //     if(fabs(trk_eta) < 1.2 ) trackDT = true;
+    if(fabs(trk_eta) > 0.9 ) {//if it is a CSCTrack
+      for(UChar_t j =0; j < 6; j++){//start looping stations
+	TrajectoryStateOnSurface tsos = surfExtrapTrkSam(trackRef, ec?MEZ[j]:-MEZ[j]);  
+	if (!tsos.isValid()) continue;
+	Float_t trkEta = tsos.globalPosition().eta(), trkPhi = tsos.globalPosition().phi();
+	UChar_t endcapCSC=ec?0:1,
+	  stationCSC = j>2?j-2:0,
+	  ringCSC = ringCandidate(stationCSC+1, trkEta, trkPhi);
+	if (!ringCSC) continue;
+	UChar_t chamberCSC = thisChamberCandidate(stationCSC+1, ringCSC, trkPhi)-1;
+ 	if ( trackNumber[endcapCSC][stationCSC][ringCSC-1][chamberCSC] < 0 )
+	  trackNumber[endcapCSC][stationCSC][ringCSC-1][chamberCSC] = itrk;
 	else {
-	  trkVeto[ trackNumber[endcapCSC][stationCSC][ringCSC][chamberCSC] ]=true;
+	  trkVeto[ trackNumber[endcapCSC][stationCSC][ringCSC-1][chamberCSC] ]=true;
 	  trkVeto[ itrk ]=true;
 	}
-      }//end of matched segments check
-    
-    if (GotCSCSegMatched) {
-      if(ec){
-	nPosTrk ++;
-      }else{
-	nNegTrk ++;
-      }
-    }
-  }//end of first track loop
+	
+	CSCDetId Layer3id  = CSCDetId( endcapCSC+1, stationCSC+1, ringCSC, chamberCSC+1, 3 );//go to layer 3 that corresponds to the LCTPos
+	const BoundPlane &Layer3Surface=cscGeom->idToDet(Layer3id)->surface();
+	tsos=surfExtrapTrkSam(trackRef, Layer3Surface.position().z());
+	LocalPoint localL3pCSC = Layer3Surface.toLocal(tsos.freeState()->position());
+	Float_t dRTrkLCT=9999.;
+	Int_t dummy_bx=0.;
+	LocalPoint *LCTPos=matchTTwithLCTs( localL3pCSC.x(), localL3pCSC.y(), endcapCSC+1, stationCSC+1, ringCSC, chamberCSC+1, mpclcts, dRTrkLCT, dummy_bx);
+	if (LCTPos!=NULL) {
+	  if (dRTrkLCT<CloestDisTrkLCT[endcapCSC][stationCSC][ringCSC-1][chamberCSC]) {
+	    CloestDisTrkLCT[endcapCSC][stationCSC][ringCSC-1][chamberCSC] = dRTrkLCT;
+	    BestTrkWithLCT[endcapCSC][stationCSC][ringCSC-1][chamberCSC] = itrk;
+	  }
+	  delete LCTPos;
+	}
+      }//end looping stations
+    }//end of track loop
+  }//end of if CSC track
 
   std::string trackExtractorName = trackExtractorPSet_.getParameter<std::string>("ComponentName");
   reco::isodeposit::IsoDepositExtractor* muIsoExtractorTrack_ = IsoDepositExtractorFactory::get()->create( trackExtractorName, trackExtractorPSet_);
@@ -687,7 +680,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	      minDRHLTDiMu = deltaR_TTHLT;
 	    }
 	  }
-	  Byte_t idx=0;
+	  UChar_t idx=0;
 	  for (vector<string>::const_iterator iter=HLTMuObjModuleNames->begin(); iter<HLTMuObjModuleNames->end();iter++,idx++ )
 	    if ( name == *iter ) {
 	      if ( deltaR_TTHLT < minDRHLTMu->at(idx) ){
@@ -778,7 +771,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
       UInt_t itrk = itTrack - gTracks->begin();
       if(itTrack->charge() == 0) continue;
       if(itTrack->p() < 3.0)  continue;
-      trackVeto = trkVeto[itrk]; 
+      trackVeto_strict = trkVeto[itrk]; 
       reco::TrackRef trackRef(gTracks, itrk );
 
       if(itTrack->charge()*MuTagcharge != -1) continue;
@@ -799,9 +792,11 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
       if(itTrack->ndof() != 0)tracks_chi2   = itTrack->chi2()/itTrack->ndof();
       tracks_charge = itTrack->charge();
 
-      tracks_dxy = itTrack->dxy(); tracks_dz = itTrack->dz();
+      tracks_dxy = itTrack->dxy();
+      tracks_dz = itTrack->dz();
       if(beamExists){
-        tracks_dxy  = itTrack->dxy(beamSpot.position()); tracks_dz = itTrack->dz(beamSpot.position());
+        tracks_dxy  = itTrack->dxy(beamSpot.position());
+	tracks_dz = itTrack->dz(beamSpot.position());
       }
 
       MuProbenHitsTrkSys  = itTrack->hitPattern().numberOfValidTrackerHits();
@@ -938,10 +933,10 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
       /////////// finished checking the vertex..
 
       nTrkCountCSCSeg=0;
-      for(Byte_t j =0; j < 4; j++){
+      for(UChar_t j =0; j < 4; j++){
 	/*CSC Chamber Candidates in each station*/
-	CSCRg[j]=-9999;
-	CSCChCand[j]=-9999;
+	CSCRg[j]= 0;
+	CSCChCand[j]= 0;
  	CSCChBad[j] = false;
 	/*Extrapolated Tracks on CSC Chamber Candidates in each station*/
 	CSCDyProjHVGap[j]=9999.;
@@ -991,11 +986,11 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	tsos = surfExtrapTrkSam(trackRef, zzPlaneME);  
 	if (!tsos.isValid()) continue;
 
-	Int_t st = j>2?j-2:0, ec=CSCEndCapPlus?1:2; // determine the station number...
+	UChar_t st = j>2?j-2:0, ec=CSCEndCapPlus?1:2; // determine the station number...
 	Float_t trkEta = tsos.globalPosition().eta(), trkPhi = tsos.globalPosition().phi();
 
-	Short_t rg = ringCandidate(st+1, trkEta, trkPhi);
-	if ( rg==-9999) continue;
+	UChar_t rg = ringCandidate(st+1, trkEta, trkPhi);
+	if (!rg) continue;
 	if (!(
 	      (j==0&&(rg==1||rg==4)) ||
 	      (j==1&&rg==2) ||
@@ -1070,7 +1065,7 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	// Check the CSC segments in that region..
 	CSCSegmentCollection::const_iterator cscSegOut;
 	TrajectoryStateOnSurface *TrajToSeg = matchTTwithCSCSeg( trackRef, cscSegments,  cscSegOut, Layer0Id);//update tsos with segment Z position, the segment z has little difference with layer 0 Z after the second or the third decimal place (in cm).
-	if ( TrajToSeg!=NULL ) {
+	if ( TrajToSeg!=NULL ) {//start saving matching information with segments
 	  /*
 	  const GeomDet* tmp_gdet=cscGeom->idToDet(cscSegOut->cscDetId());
 	  const CSCChamber* cscchamber = cscGeom->chamber(cscSegOut->cscDetId());
@@ -1121,14 +1116,15 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	  }
 	  nTrkCountCSCSeg++;
 	  delete TrajToSeg;
-	}
+	}//end saving matching information with segments
 
        	////// Loop over MPC infromation to look for LCTs....
+	trackVeto_isClosestToLCT=(BestTrkWithLCT[ec-1][st][rg-1][CSCChCand[st]-1]!=-1&&(signed)itrk!=BestTrkWithLCT[ec-1][st][rg-1][CSCChCand[st]-1]);
 	CSCDetId Layer3id  = CSCDetId( ec, st+1, rg,  CSCChCand[st], 3 );//go to layer 3 that corresponds to the LCTPos
-	const GeomDet* Layer3gdet=cscGeom->idToDet(Layer3id);
-	tsos=surfExtrapTrkSam(trackRef, Layer3gdet->surface().position().z());
-	if (tsos.isValid()) {
-	  LocalPoint localL3pCSC = Layer3gdet->surface().toLocal(tsos.freeState()->position());
+	const BoundPlane &Layer3Surface=cscGeom->idToDet(Layer3id)->surface();
+	tsos=surfExtrapTrkSam(trackRef, Layer3Surface.position().z());
+	if (tsos.isValid()) {//start matching with LCTs
+	  LocalPoint localL3pCSC = Layer3Surface.toLocal(tsos.freeState()->position());
 	  LocalPoint *LCTPos=matchTTwithLCTs( localL3pCSC.x(), localL3pCSC.y(), CSCEndCapPlus?1:2, st+1, CSCRg[st], CSCChCand[st], mpclcts, CSCDxyTTLCT[st], CSCLCTbx[st]);
 	  if (LCTPos!=NULL) {
 	    CSCLCTxLc[st]=LCTPos->x();
@@ -1141,10 +1137,10 @@ TPTrackMuonSys::analyze(const edm::Event& event, const edm::EventSetup& setup){
 	    delete LCTPos;
 	    //cerr<<"segZ_TTy,LCTZ_TTy:"<<CSCSegyLc[st]-CSCDyTTSeg[st]<<","<<localL3pCSC.y()<<";"<<endl;
  	  }//end of if found LCT
-	}//end of if layer 3 extrapolation is available
+	}//end matching with LCTs
       } // for loop for the stations -- j
       /*
-      for (Byte_t st=0;st<4;st++) {
+      for (UChar_t st=0;st<4;st++) {
 	lctSt[st] = ( CSCDxyTTLCT[st] >0. && CSCDxyTTLCT[st] < 40 )?1:0;
 	segSt[st] = ( CSCDxyTTSeg[st] >0. && CSCDxyTTSeg[st] < 40)?1:0;
 	}*/
@@ -1215,14 +1211,14 @@ void TPTrackMuonSys::beginRun(const Run& r, const EventSetup& iSet)
   TH2F *TH2F_BadChambers=new TH2F(plotname,plottitle,36,1,37,18,-9,9);
   const char *chambers[36]  = {"01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36"};
   const char *rings[18] = {"ME-42","ME-41","ME-32","ME-31","ME-22","ME-21","ME-13","ME-12","ME-11","ME+11","ME+12","ME+13","ME+21","ME+22","ME+31","ME+32","ME+41","ME+42"};
-  for (Byte_t i=0;i<36;i++) 
+  for (UChar_t i=0;i<36;i++) 
     TH2F_BadChambers->GetXaxis()->SetBinLabel(i+1,chambers[i]);
-  for (Byte_t i=0;i<18;i++)
+  for (UChar_t i=0;i<18;i++)
     TH2F_BadChambers->GetYaxis()->SetBinLabel(i+1,rings[i]);
   for( Short_t indexc = 1; indexc<=540; ++indexc ) {// chamber indices are in range 1-468 (CSCs 2008) or 469-540 (ME42)
     CSCDetId id = CSCIndexer().detIdFromChamberIndex( indexc ); 
     if ( !badChambers_->isInBadChamber( id ) ) continue;
-    Byte_t ring=id.station()*10+id.ring();
+    UChar_t ring=id.station()*10+id.ring();
     Float_t fillY;
     switch ( ring )
       {
@@ -1513,7 +1509,7 @@ Bool_t TPTrackMuonSys::matchTTwithRPCEChit(Bool_t trackDir,
 }
 */
 //////////////  Get the matching with LCTs...
-LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t ec, Short_t st, Short_t &rg, Short_t cham, 
+LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, UChar_t ec, UChar_t st, UChar_t &rg, UChar_t cham, 
 					     edm::Handle<CSCCorrelatedLCTDigiCollection> mpclcts, Float_t &dRTrkLCT, Int_t &lctBX ) {
   LocalPoint *interSect=NULL;
   
@@ -1535,8 +1531,8 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       if(!lct_valid)continue;
       //In CSC offline/hlt software in general, is COUNT FROM ONE, such as CSCGeometry.
       //However, the LCT software counts from zero. strip_id is from 0 to 159. wireGroup_id is from 0 to 31(ME13),47(ME11),63(ME1234/2),95(ME31,41),111(ME21). So here we need to plus one.
-      Byte_t wireGroup_id = (*mpcIt).getKeyWG()+1;
-      Byte_t strip_id=(*mpcIt).getStrip()/2+1;
+      UChar_t wireGroup_id = (*mpcIt).getKeyWG()+1;
+      UChar_t strip_id=(*mpcIt).getStrip()/2+1;
       //if ( id.ring()==4 ) cerr<<"Alert id.ring()==4"<<endl;
       Bool_t me11=(st == 1) && (id.ring() == 1 || id.ring() == 4),
 	me11a = me11 && strip_id>64;
@@ -1555,7 +1551,7 @@ LocalPoint * TPTrackMuonSys::matchTTwithLCTs(Float_t xPos, Float_t yPos, Short_t
       }
       //if ( me11b && id.endcap()!=1 ) strip_id=65-strip_id;
       const CSCLayerGeometry *layerGeom = cscGeom->chamber(id)->layer (3)->geometry ();
-      for(Byte_t ii = 0; ii < 3; ii++){
+      for(UChar_t ii = 0; ii < 3; ii++){
 	// if ( strip_id>64 ) LogWarning("Strip_id") << "Got "<<strip_id<<", but there are "<< Nstrips <<" strips in total." <<m_hlt.process();
 	LocalPoint interSect_ = layerGeom->stripWireGroupIntersection(strip_id, wireGroup_id);
 	//	printf( "ME%d/%d: %.1f/%d, %d/%d: xLCT-xTT=%.2f-%.2f; yLCT-yTT=%.2f-%.2f \n",st,id.ring(),strip_id,Nstrips,wireGroup_id,layerGeom->numberOfWireGroups(),interSect_.x(),xPos,interSect_.y(),yPos);
@@ -1779,7 +1775,7 @@ void TPTrackMuonSys::getCSCSegWkeyHalfStrip(const vector<CSCRecHit2D> &theseRecH
   for ( vector<CSCRecHit2D>::const_iterator iRH = theseRecHits.begin(); iRH != theseRecHits.end(); iRH++,nhits++ ) {
     CSCDetId idRH = (CSCDetId)(*iRH).cscDetId();
     if (idRH.ring() == 4) me11a = true;
-    Byte_t layer = idRH.layer();
+    UChar_t layer = idRH.layer();
     Float_t pWS  = (*iRH).positionWithinStrip();
     Int_t m_cStrp  = (Int_t) (2.0*(iRH->channels(1) + pWS - 0.5 ));
     if ( layer%2!=0 &&
@@ -1935,8 +1931,8 @@ void TPTrackMuonSys::chamberCandidates(Int_t station, Float_t feta, Float_t phi,
   // yeah, hardcoded again...
   coupleOfChambers.clear();
 
-  Int_t ring = ringCandidate(station, feta, phi);
-  if(ring != -9999){
+  UChar_t ring = ringCandidate(station, feta, phi);
+  if(ring){
     Float_t phi_zero = 0.;// check! the phi at the "edge" of Ch 1
     Float_t phi_const = 2.*M_PI/36.;
     Int_t first_chamber = 1, last_chamber = 36;
@@ -2007,19 +2003,19 @@ Int_t TPTrackMuonSys::ringCandidate(Int_t station, Float_t feta, Float_t phi){
     LogError("")<<"Invalid station: "<<station<<endl;
     break;
   }
-  return -9999;
+  return 0;
 }
 
-Short_t TPTrackMuonSys::thisChamberCandidate(Short_t station, Short_t ring, Float_t phi){
+UChar_t TPTrackMuonSys::thisChamberCandidate(UChar_t station, UChar_t ring, Float_t phi){
   //search for chamber candidate based on CMS IN-2007/024
   //10 deg chambers are ME1,ME22,ME32,ME42 chambers; 20 deg chambers are ME21,31,41 chambers
   //Chambers one always starts from approx -5 deg.
-  const Short_t nVal = (station>1 && ring == 1)?18:36;
+  const UChar_t nVal = (station>1 && ring == 1)?18:36;
   const Float_t ChamberSpan=2*M_PI/nVal;
   Float_t dphi = phi + M_PI/36;
   while (dphi >= 2*M_PI) dphi -= 2*M_PI;
   while (dphi < 0) dphi += 2*M_PI;
-  Short_t ChCand=floor(dphi/ChamberSpan)+1;
+  UChar_t ChCand=floor(dphi/ChamberSpan)+1;
   return ChCand>nVal?nVal:ChCand;
 }
 
@@ -2373,7 +2369,7 @@ Float_t TPTrackMuonSys::YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing){
   const Float_t *deadZoneCenter;
   Float_t deadZoneHeightHalf=0.32*7/2;// wire spacing * (wires missing + 1)/2
   Float_t minY=999999.;
-  Byte_t nGaps=2;
+  UChar_t nGaps=2;
   switch (abs(StationAndRing)) {
   case 11:
   case 14:
@@ -2398,7 +2394,7 @@ Float_t TPTrackMuonSys::YDistToHVDeadZone(Float_t yLocal, Int_t StationAndRing){
     deadZoneCenter=deadZoneCenterME234_2;
     nGaps=4;
   }
-  for ( Byte_t iGap=0;iGap<nGaps;iGap++ ) {
+  for ( UChar_t iGap=0;iGap<nGaps;iGap++ ) {
     Float_t newMinY=yLocal<deadZoneCenter[iGap]?deadZoneCenter[iGap]-deadZoneHeightHalf-yLocal:yLocal-(deadZoneCenter[iGap]+deadZoneHeightHalf);
     if ( newMinY<minY ) minY=newMinY;
   }
