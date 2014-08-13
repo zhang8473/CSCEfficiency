@@ -4,7 +4,8 @@
 #Author: Jinzhong Zhang(zhangjin@cern.ch), Northeastern University, Boston, U.S.A
 #Based on: Chaouki's old tree fitter settings
 #This script should be run by SelectAndFit.py
-#Usage: cmsRun tagandProbe.py TreeName(string, e.g. ME-1_1_3 ) ClassifiedTreeFile(optional) IsZPeak(ture/false)
+#Usage: cmsRun tagandProbe.py File Station IsZPeak(ture/false)
+#Station=[0-4] station 0 means "or" combination of several stations
 import sys
 
 if sys.argv[0] == "python" or sys.argv[0] == "cmsRun":
@@ -12,30 +13,40 @@ if sys.argv[0] == "python" or sys.argv[0] == "cmsRun":
 else:
     args=sys.argv[0:]
 
-TreeName=args[1]
+from Config import TreeName
+
+if len(args)>1:
+    ClassifiedTreeFile=args[1]
 
 if len(args)>2:
-    ClassifiedTreeFile=args[2]
+    from Config import ptbin,etabin1,etabin2,etabin3,etabin4,phibin  #import the pt,eta,phi binning
+    station=int(args[2])
+    if station<=1:
+        etabin=etabin1
+    elif station==2:
+        etabin=etabin2
+    elif station==3:
+        etabin=etabin3
+    elif station==4:
+        etabin=etabin4
+    else:
+        print "No input file. Exit."
+        sys.exit()
 else:
-    from Config import ClassifiedTreeFile as ClassifiedTreeFile
+    print "No input station number. Exit."
+    sys.exit()
 
 if len(args)>3:
     IsZPeak=args[3]
 else:
-    from Config import AnalyzeZPeak as IsZPeak
+    from Config import Resonance
+    IsZPeak=Resonance is "Z"
 
 from Config import CalculateSystematic as CalculateSystematic
 from Config import RunOnMC as RunOnMC
+from Config import TemporaryOutputFile
+print "Running TagProbeFitTreeAnalyzer on ","station%d on"%(station), "Z" if IsZPeak else "JPsi","pole."
 
-if TreeName[2] in ("1","2","3","4"):
-    station=int(TreeName[2])
-elif TreeName[3] in ("1","2","3","4"):
-    station=int(TreeName[3])
-else:
-    print "Incorrect TreeName: cannot parse the station number from TreeName. Is that MEx or ME+x, or ME-x?"
-    sys.exit()
-
-print "Running TagProbeFitTreeAnalyzer on "+TreeName+", station%d...."%(station),"on","Z" if IsZPeak else "JPsi"
 
 import FWCore.ParameterSet.Config as cms
 process = cms.Process("TagProbe")
@@ -48,7 +59,7 @@ process.TagProbeFitTreeAnalyzer = cms.EDAnalyzer("TagProbeFitTreeAnalyzer",
     InputFileNames     = cms.vstring(ClassifiedTreeFile),
     InputDirectoryName = cms.string("Probes"),
     InputTreeName      = cms.string(TreeName),
-    OutputFileName     = cms.string("%s%s.root" % (TagProbeFitResult,TreeName) ), 
+    OutputFileName     = cms.string("%s%s" % (TagProbeFitResult,ClassifiedTreeFile.replace(TemporaryOutputFile[:-5],"")) ), 
 
     #numbrer of CPUs to use for fitting
     NumCPU = cms.uint32(3),
@@ -122,31 +133,26 @@ process.TagProbeFitTreeAnalyzer = cms.EDAnalyzer("TagProbeFitTreeAnalyzer",
 
 exec( "process.TagProbeFitTreeAnalyzer.Categories = cms.PSet( foundLCTSt%d  = cms.vstring(\"lctStation%d\",  \"dummy[true=1,false=0]\"), foundSEGSt%d  = cms.vstring(\"segStation%d\",  \"dummy[true=1,false=0]\") )"%(station,station,station,station) )
 
+EfficiencyBins = cms.PSet(
+            tracks_pt        = cms.vdouble(ptbin),
+            tracks_eta        = cms.vdouble(etabin),
+            tracks_phi       = cms.vdouble(phibin)
+)
 #the name of the parameter set becomes the name of the directory
 process.TagProbeFitTreeAnalyzer.Efficiencies = cms.PSet(
     lct_effV = cms.PSet(
         EfficiencyCategoryAndState = cms.vstring("foundLCTSt%d"%(station),"true"),
         UnbinnedVariables = cms.vstring("invMass","weight"),
-        BinnedVariables = cms.PSet(
-            tracks_pt        = cms.vdouble(0., 1000.),
-            tracks_e        = cms.vdouble(15., 1000.),
-            tracks_phi       = cms.vdouble(-7.0, 7.0),
-            ),
+        BinnedVariables = cms.PSet(EfficiencyBins),
         BinToPDFmap = cms.vstring("VoigtianPlusExpo") if IsZPeak else cms.vstring("VoigtianPlusLinear")
         ),
     seg_effV = cms.PSet(
         EfficiencyCategoryAndState = cms.vstring("foundSEGSt%d"%(station),"true"),
         UnbinnedVariables = cms.vstring("invMass","weight"),
-        BinnedVariables = cms.PSet(
-            tracks_pt        = cms.vdouble(0., 1000.),
-            tracks_e        = cms.vdouble(15., 1000.),
-            tracks_phi       = cms.vdouble(-7.0, 7.0),
-            ),
+        BinnedVariables = cms.PSet(EfficiencyBins),
         BinToPDFmap = cms.vstring("VoigtianPlusExpo") if IsZPeak else cms.vstring("VoigtianPlusLinear")
         )
 )
-
-print process.TagProbeFitTreeAnalyzer.PDFs.VoigtianPlusExpo
 
 if CalculateSystematic and (not RunOnMC):
     print "I am going to calculate the effficency with different signal and background modeling..."
@@ -155,74 +161,52 @@ if CalculateSystematic and (not RunOnMC):
         lct_effV_SigModeling = cms.PSet(
             EfficiencyCategoryAndState = cms.vstring("foundLCTSt%d"%(station),"true"),
             UnbinnedVariables = cms.vstring("invMass"),
-            BinnedVariables = cms.PSet(
-                tracks_pt        = cms.vdouble(0., 1000.),
-                tracks_e        = cms.vdouble(15., 1000.),
-                tracks_phi       = cms.vdouble(-7.0, 7.0),
-                ),
+            BinnedVariables = cms.PSet(EfficiencyBins),
             BinToPDFmap = cms.vstring("GaussianPlusExpo") if IsZPeak else cms.vstring("GaussianPlusLinear")
             ),
         seg_effV_SigModeling = cms.PSet(
             EfficiencyCategoryAndState = cms.vstring("foundSEGSt%d"%(station),"true"),
             UnbinnedVariables = cms.vstring("invMass"),
-            BinnedVariables = cms.PSet(
-                tracks_pt        = cms.vdouble(0., 1000.),
-                tracks_e        = cms.vdouble(15., 1000.),
-                tracks_phi       = cms.vdouble(-7.0, 7.0),
-                ),
+            BinnedVariables = cms.PSet(EfficiencyBins),
             BinToPDFmap = cms.vstring("GaussianPlusExpo") if IsZPeak else cms.vstring("GaussianPlusLinear")
             ),
         lct_effV_BkgModeling = cms.PSet(
             EfficiencyCategoryAndState = cms.vstring("foundLCTSt%d"%(station),"true"),
             UnbinnedVariables = cms.vstring("invMass"),
-            BinnedVariables = cms.PSet(
-                tracks_pt        = cms.vdouble(0., 1000.),
-                tracks_e        = cms.vdouble(15., 1000.),
-                tracks_phi       = cms.vdouble(-7.0, 7.0),
-                ),
+            BinnedVariables = cms.PSet(EfficiencyBins),
             BinToPDFmap = cms.vstring("VoigtianPlusQuadratic")
             ),
         seg_effV_BkgModeling = cms.PSet(
             EfficiencyCategoryAndState = cms.vstring("foundSEGSt%d"%(station),"true"),
             UnbinnedVariables = cms.vstring("invMass"),
-            BinnedVariables = cms.PSet(
-                tracks_pt        = cms.vdouble(0., 1000.),
-                tracks_e        = cms.vdouble(15., 1000.),
-                tracks_phi       = cms.vdouble(-7.0, 7.0),
-                ),
+            BinnedVariables = cms.PSet(EfficiencyBins),
             BinToPDFmap = cms.vstring("VoigtianPlusQuadratic")
             )
         )
-"""
-if RunOnMC: # it will crash. Problems are in TagProbeFitTreeAnalyzer.
+
+if RunOnMC: # BinToPDFmap has to be defined, otherwise it will crash. Problems are in TagProbeFitTreeAnalyzer. Only the CntEfficiency (counting) will be used later.
     process.TagProbeFitTreeAnalyzer.Categories = cms.PSet(
         process.TagProbeFitTreeAnalyzer.Categories,
-        isTrueMuMuPair = cms.vstring("MCtrue", "dummy[true=1,false=0]")
+        mcTrue = cms.vstring("MCtrue", "dummy[true=1,false=0]")
         )
     process.TagProbeFitTreeAnalyzer.Efficiencies = cms.PSet(
         process.TagProbeFitTreeAnalyzer.Efficiencies,
         lct_effV_MCTruth = cms.PSet(
             EfficiencyCategoryAndState = cms.vstring("foundLCTSt%d"%(station),"true"),
             UnbinnedVariables = cms.vstring("invMass","weight"),
-            BinnedVariables = cms.PSet(
-                isTrueMuMuPair = cms.vstring("true"),
-                tracks_pt        = cms.vdouble(0., 1000.),
-                tracks_e        = cms.vdouble(15., 1000.),
-                tracks_phi       = cms.vdouble(-7.0, 7.0),
-                )
+            BinnedVariables = cms.PSet(EfficiencyBins,mcTrue = cms.vstring("true")),
+            BinToPDFmap = cms.vstring("VoigtianPlusExpo") if IsZPeak else cms.vstring("VoigtianPlusLinear")
             ),
         seg_effV_MCTruth = cms.PSet(
             EfficiencyCategoryAndState = cms.vstring("foundSEGSt%d"%(station),"true"),
             UnbinnedVariables = cms.vstring("invMass","weight"),
-            BinnedVariables = cms.PSet(
-                isTrueMuMuPair = cms.vstring("true"),
-                tracks_pt        = cms.vdouble(0., 1000.),
-                tracks_e        = cms.vdouble(15., 1000.),
-                tracks_phi       = cms.vdouble(-7.0, 7.0),
-                )
+            BinnedVariables = cms.PSet(EfficiencyBins,mcTrue = cms.vstring("true")),
+            BinToPDFmap = cms.vstring("VoigtianPlusExpo") if IsZPeak else cms.vstring("VoigtianPlusLinear")
             )
         )
-"""
+
+print process.TagProbeFitTreeAnalyzer.PDFs.VoigtianPlusExpo
+print process.TagProbeFitTreeAnalyzer.Efficiencies
 
 process.fitness = cms.Path(
     process.TagProbeFitTreeAnalyzer

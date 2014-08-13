@@ -3,13 +3,14 @@
 #################################################################################
 #Advanced Usage:
 #python Step2_PlotAll.py arg1 arg2
-#   arg1 is the "TnP_" files directory path;
-#   arg2 is the postfix of root path name "lct_effV" and "seg_effV";
+#   arg1 is directory of the files given by the TagandProbe cmssw package. The file names have to match what is defined in Config.py;
+#   arg2 "lct_effV"+arg2 and "seg_effV"+arg2 are the directory name in the TagandProbe result file;
 #   arg2 can be specified as "bkg" or "sig" for background and signal modeling
 #Example1(plot default efficiencies): python Step2_PlotAll.py
 #Example2(systematic -- bkg modeling): python Step2_PlotAll.py /uscms/home/zhangjin/nobackup/ bkg
 #Example3(systematic -- sig modeling): python Step2_PlotAll.py /uscms/home/zhangjin/nobackup/ sig
-#Example2 and 3 are used for systematic calculation.
+#Example4(systematic -- MCTruth     ): python Step2_PlotAll.py /uscms/home/zhangjin/nobackup/ mc
+#Example2-4 are used for systematic calculation.
 ##################################################################################
 
 from  ROOT import *
@@ -27,54 +28,128 @@ Length = arr('d',[0.00, 0.85, 0.90, 0.95, 1.00])
 TColor.CreateGradientColorTable(5,Length,Red,Green,Blue,500)
 gStyle.SetNumberContours(500)
 
-import sys,os
+import sys,os,re
 if (sys.argv[0] == "python"): args=sys.argv[2:]
 else: args=sys.argv[1:]
 
 Prefix=""
 Postfix=""
+TagProbeFitResult=TagProbeFitResult.split("/")[-1]
+ResultPlotsFileName=ResultPlotsFileName.split("/")[-1]
 if len(args)>0:
     Prefix=args[0]
     if Prefix[-1] != "/":
         Prefix+="/"
-    TagProbeFitResult=TagProbeFitResult.split("/")[-1]
-    ResultPlotsFileName=ResultPlotsFileName.split("/")[-1]
     if len(args)>1:
         if args[1] == "bkg":
             Postfix="_BkgModeling"
         elif args[1] == "sig":
             Postfix="_SigModeling"
+        elif args[1] == "mc":
+            Postfix="_MCTruth"
         else:
             Postfix=args[1]
     ResultPlotsFileName=Prefix+ResultPlotsFileName.replace(".root",Postfix+".root")
 
 file_out=TFile.Open(ResultPlotsFileName,'RECREATE')
 
-def GetEff(filename_,lctpath="lct_effV",segpath="seg_effV"):
-    import os
+if "pt" in Group:
+    binning="pt"
+    plotname="tracks_pt_PLOT_tracks_eta_bin0_&_tracks_phi_bin0"
+elif "eta" in Group:
+    binning="eta"
+    plotname="tracks_eta_PLOT_tracks_phi_bin0_&_tracks_pt_bin0"
+elif "phi" in Group:
+    binning="phi"
+    plotname="tracks_phi_PLOT_tracks_eta_bin0_&_tracks_pt_bin0"
+
+if Postfix=="_MCTruth":
+    plotname+="_&_mcTrue_true"
+
+def GetEff(f_in,path="lct_effV",effcat="fit_eff"):
     try:
-        if os.path.isfile(filename_):
-            f_in =TFile(filename_,"READ");
-            LCTEff=f_in.Get("Probes/"+lctpath+"/fit_eff").get().find("efficiency")
-            Segeff=f_in.Get("Probes/"+segpath+"/fit_eff").get().find("efficiency")
-            return [Segeff.getVal(),abs(Segeff.getErrorLo()),Segeff.getErrorHi(),LCTEff.getVal(),abs(LCTEff.getErrorLo()),LCTEff.getErrorHi()]
-        else:
-            print filename_+" is not found, skip.. "
-            return [0.]*6
+        eff=f_in.Get("Probes/"+path+"/"+effcat).get().find("efficiency")
+        return [eff.getVal(),abs(eff.getErrorLo()),eff.getErrorHi()]
     except:
-        print "\033[97mOther problems, skip",filename_,"\033[0m"
-        #os.remove(filename_)
-        return [0.]*6 
-    
-if AnalyzeStations:
-    fitEffs=[]
+        print "\033[97mOther problems, skip",f_in.GetName(),"\033[0m"
+        return [0.]*3
+
+def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname):
+    canvas_=f_in.Get("Probes/"+path+"/"+effcat+"_plots/"+name_)
+    dummyplot_=canvas_.GetListOfPrimitives().At(0)
+    plot_=canvas_.FindObject("hxy_fit_eff").Clone();
+    #we are going to fix the bugs in tagandprobe package in the following code
+    #1 - recreate the arrays
+    nbins=plot_.GetN()
+    xval=zeros(nbins, dtype=float)
+    xerr=zeros(nbins, dtype=float)
+    yerrhi=zeros(nbins, dtype=float)
+    yerrlo=zeros(nbins, dtype=float)
+    #2 - fill the yerror bars from the correct input (only for fit efficiency)
+    if effcat=="fit_eff":
+        list_=f_in.Get("Probes/lct_effV").GetListOfKeys()
+        ikey=list_.First()
+        while (ikey!=list_.After(list_.Last())):
+            dirname_=ikey.GetName()
+            binnumber=re.match(".*"+binning+"_bin(\d*)_.*",dirname_)
+            if binnumber:
+                ibin=int(binnumber.group(1))
+                if ibin<nbins:
+                    result_=f_in.Get("Probes/lct_effV/"+dirname_+"/fitresults").floatParsFinal().find("efficiency")
+                    yerrlo[ibin]=abs(result_.getErrorLo())
+                    yerrhi[ibin]=result_.getErrorHi()
+            ikey = list_.After(ikey);
+    #3 - fill the correct x values from the binning 
+    exec( "bins=%sbin%s"%(binning,str(st_) if binning=="eta" else "") )
+    for ibin in range(nbins):
+        xval[ibin]=(bins[ibin]+bins[ibin+1])/2
+        xerr[ibin]=abs(bins[ibin+1]-bins[ibin])/2
+    #4 - the y values are correct
+    Y=plot_.GetY()
+    #5 - remake the TGraph
+    outputplot=TGraphAsymmErrors(nbins, xval, Y, xerr, xerr, yerrlo, yerrhi)
+    outputplot.SetName(f_in.GetName().replace(Prefix+TagProbeFitResult,"")[:-5]+path)
+    outputplot.SetTitle(outputplot.GetName())
+    outputplot.GetXaxis().SetTitle(dummyplot_.GetXaxis().GetTitle())
+    outputplot.GetYaxis().SetTitle(dummyplot_.GetYaxis().GetTitle())
+    outputplot.GetYaxis().SetTitleOffset(1.2)
+    outputplot.SetMarkerStyle(8)
+    outputplot.SetMarkerSize(.5)
+    #EffCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
+    #EffCanvas.cd()
+    #outputplot.Draw("AP")
+    #raw_input("pause")
+    return outputplot
+
+if "Stations" in Group:
+    Effs=[]
     for idx in range(1,n_stations+1):
-      fitEffs.append( GetEff( "%s%s%s.root" % (Prefix,TagProbeFitResult,stations[idx][1]),"lct_effV"+Postfix,"seg_effV"+Postfix ) )
-    fitEffs=array(fitEffs).transpose()*100.
+        filename_=Prefix+TagProbeFitResult+stations[idx][1]+".root"
+        if not os.path.isfile(filename_):
+            print filename_+" is not found, skip.. "
+            Effs.append([0.]*6)
+            continue
+        f_in=TFile(filename_,"READ");
+        if Postfix=="_MCTruth":
+            Effs.append( GetEff(f_in, "lct_effV"+Postfix,"cnt_eff")+GetEff(f_in,"seg_effV"+Postfix,"cnt_eff") )
+            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",stations[idx][1])
+            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",stations[idx][1])
+            file_out.cd()
+            LCTPlot.Write()
+            SEGPlot.Write()
+        else:
+            Effs.append( GetEff(f_in, "lct_effV"+Postfix,"fit_eff")+GetEff(f_in,"seg_effV"+Postfix,"fit_eff" ) )
+            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",stations[idx][1])
+            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",stations[idx][1])
+            file_out.cd()
+            LCTPlot.Write()
+            SEGPlot.Write()
+        f_in.Close()
+    Effs=array(Effs).transpose()*100.
     xval=array(range(1,n_stations+1))*1.0
     xerr=zeros(n_stations, dtype=float)
-    SegEff=TGraphAsymmErrors(n_stations, xval, array(fitEffs[0]), xerr, xerr, array(fitEffs[1]), array(fitEffs[2]))
-    LCTEff=TGraphAsymmErrors(n_stations, xval, array(fitEffs[3]), xerr, xerr, array(fitEffs[4]), array(fitEffs[5]))
+    SegEff=TGraphAsymmErrors(n_stations, xval, array(Effs[0]), xerr, xerr, array(Effs[1]), array(Effs[2]))
+    LCTEff=TGraphAsymmErrors(n_stations, xval, array(Effs[3]), xerr, xerr, array(Effs[4]), array(Effs[5]))
     SegCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
     SegCanvas.cd()
     SegEff.SetMaximum(100)
@@ -92,7 +167,7 @@ if AnalyzeStations:
     file_out.cd()
     SegEff.Write("SEGEff")
     LCTEff.Write("LCTEff")
-else:
+elif "Chambers" in Group:
     SEGEff=TH2F("SEGEff","segment efficiency",36,1,37,18,-9,9)
     SEGEff.SetMarkerSize(0.7)
     SEGEff.SetContour(500)
@@ -121,15 +196,25 @@ else:
         st=int(chambers[idx][3])
         rg=int(chambers[idx][5])
         ch=int(chambers[idx][7:])
-        fitEffs=GetEff( "%s%s%s.root" % (Prefix,TagProbeFitResult,chambers[idx]),"lct_effV"+Postfix,"seg_effV"+Postfix )
+        filename_="%s%s%s.root" % (Prefix,TagProbeFitResult,chambers[idx])
+        if not os.path.isfile(filename_):
+            print filename_+" is not found, skip.. "
+            Effs.append([0.]*6)
+            continue
+        f_in=TFile(filename_,"READ");
+        if Postfix=="_MCTruth":
+            Effs=GetEff(f_in, "lct_effV"+Postfix,"cnt_eff")+GetEff(f_in,"seg_effV"+Postfix,"cnt_eff")
+        else:
+            Effs=GetEff(f_in, "lct_effV"+Postfix,"fit_eff")+GetEff(f_in,"seg_effV"+Postfix,"fit_eff" )
+        f_in.Close()
         iBin_y=RingToYMap[(st,rg)]
         iBin_y=10+iBin_y if ec else 9-iBin_y
-        SEGEff.SetBinContent(ch,iBin_y,fitEffs[0]*100.);
-        SEGEff_downErr.SetBinContent(ch,iBin_y,fitEffs[1]*100.);
-        SEGEff_upErr.SetBinContent(ch,iBin_y,fitEffs[2]*100.);
-        LCTEff.SetBinContent(ch,iBin_y,fitEffs[3]*100.);
-        LCTEff_downErr.SetBinContent(ch,iBin_y,fitEffs[4]*100.);
-        LCTEff_upErr.SetBinContent(ch,iBin_y,fitEffs[5]*100.);
+        SEGEff.SetBinContent(ch,iBin_y,Effs[0]*100.);
+        SEGEff_downErr.SetBinContent(ch,iBin_y,Effs[1]*100.);
+        SEGEff_upErr.SetBinContent(ch,iBin_y,Effs[2]*100.);
+        LCTEff.SetBinContent(ch,iBin_y,Effs[3]*100.);
+        LCTEff_downErr.SetBinContent(ch,iBin_y,Effs[4]*100.);
+        LCTEff_upErr.SetBinContent(ch,iBin_y,Effs[5]*100.);
     SegCanvas=TCanvas("segment efficiency","segment efficiency",1500,1000)
     SegCanvas.cd()
     SEGEff.Draw("COLZ,TEXT")
@@ -153,5 +238,24 @@ else:
     LCTEff.Write()
     LCTEff_upErr.Write()
     LCTEff_downErr.Write()
+else:
+    filename_=Prefix+TagProbeFitResult+"AllStations.root"
+    if not os.path.isfile(filename_):
+        print filename_+" is not found, skip.. "
+    else:
+        f_in=TFile(filename_,"READ");
+        if Postfix=="_MCTruth":
+            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",1)
+            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",1)
+            file_out.cd()
+            LCTPlot.Write()
+            SEGPlot.Write()
+        else:
+            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",1)
+            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",1)
+            file_out.cd()
+            LCTPlot.Write()
+            SEGPlot.Write()
+        f_in.Close()
 raw_input("Plots are saved in "+ResultPlotsFileName+". Press ENTER to exit")
 file_out.Close()
