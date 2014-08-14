@@ -11,7 +11,7 @@ pileup_mc=[2.344E-05,2.344E-05,2.344E-05,2.344E-05,4.687E-04,4.687E-04,7.032E-04
 #pileup_mc=mix.input.nbPileupEvents.probValue
 TreeName="Fraction"
 sampleweight=1.
-ptbin=[5,10,20,40,60,80,120,1000]; #pt binning
+ptbin=[5,10,20,40,60,80,100,200,500,1000]; #pt binning
 etabin1=[ 0,0.9,1.1,1.2,1.3,1.5,1.7,1.9,2.1,2.4 ]; #station 1 eta binning: ME13 0.9-1.1, ME12 1.2-1.7, ME11 1.7-2.4
 etabin2=[ 0,0.9,1.0,1.3,1.6,2.0,2.4 ];#station 2 eta binning:ME22 1.0-1.6, ME21 1.6-2.4
 etabin3=[ 0,0.9,1.1,1.3,1.5,1.7,2.1,2.4 ]#station 3 eta binning:ME32 1.1-1.7, ME31 1.7-2.4
@@ -31,16 +31,16 @@ TemporaryOutputFile="/tmp/Tmp_"+dir_+".root"#New branches will be added to the o
 # A normal user is not supposed to change anything below  #
 ###########################################################
 #---note: The logical expressions are in C style
-DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCDyErrProjHVGap# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# && !trackVeto_isClosestToLCT )"#default
-ProbeSegment="( CSCDxyTTSeg#<5. || CSCDxyTTSeg#<5*CSCDxyErrTTSeg# )"# too strict cut, not using
-ProbeLCT="( CSCDxyTTLCT#<5. || CSCDxyTTLCT#<5*CSCDxyErrTTLCT# )"# too strict cut, not using
+DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCDyErrProjHVGap# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# )"#default
+ProbeSegment="( CSCDxyTTSeg#<5. || CSCDxyTTSeg#<5*CSCDxyErrTTSeg# )"# tight cut
+ProbeLCT="( CSCDxyTTLCT#<40. && CSCDxyTTLCT#>0. )"#default
 
 #DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 ) "#old one
 #DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCyErrProjLc# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# ) "# for calculate systematic: close-by muons
 #ProbeSegment="( CSCDrTTSeg#<200. && CSCDrTTSeg#>0.)"# for calculate systematic: Segment to TT distance cut
 #ProbeLCT="( CSCDrTTLCT#<200. && CSCDrTTLCT#>0. )"# for calculate systematic: LCT to TT distance cut
 #ProbeSegment="( CSCDxyTTSeg#<40. && CSCDxyTTSeg#>0.)"#default
-#ProbeLCT="( CSCDxyTTLCT#<40. && CSCDxyTTLCT#>0. )"#default
+#ProbeLCT="( CSCDxyTTLCT#<5. || CSCDxyTTLCT#<5*CSCDxyErrTTLCT# )"# tight cut
 
 
 if Resonance is "Z":
@@ -74,12 +74,13 @@ if "phi" not in Group:
 
 if "Stations" in Group:
   stations={
-    1:("CSCRg1","ME1",kMagenta,1),
-    2:("CSCRg2","ME2",kRed,2),
-    3:("CSCRg3","ME3",kGreen,3),
-    4:("CSCRg4","ME4",kBlue,4)
+    1:("( CSCRg1==4 )","ME11A",kMagenta,1),
+    2:("( CSCRg1==1 )","ME11B",kRed-9,1),
+    3:("(CSCRg1==2 || CSCRg1==3)","ME12+13",kBlack,1),
+    4:("CSCRg2","ME2",kRed,2),
+    5:("CSCRg3","ME3",kGreen,3),
+    6:("CSCRg4","ME4",kBlue,4)
     }
-
   """
   stations={
     1:("( CSCRg1==4 )","ME11A",kMagenta,1),
@@ -100,7 +101,6 @@ if "Stations" in Group:
     4:("CSCRg1==1&&!CSCEndCapPlus","ME-11B",kRed,1)
     }
   """
-
   """
   stations={
     1:("( (CSCRg1==1 || CSCRg1==4) && abs(tracks_eta)>2.1 )","ME11A",kMagenta,1),

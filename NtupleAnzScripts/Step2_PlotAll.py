@@ -85,9 +85,11 @@ def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname)
     xerr=zeros(nbins, dtype=float)
     yerrhi=zeros(nbins, dtype=float)
     yerrlo=zeros(nbins, dtype=float)
-    #2 - fill the yerror bars from the correct input (only for fit efficiency)
+    #2 - the y values are correct
+    Y=plot_.GetY()
+    #3 - fill the yerror bars from the correct input (only for fit efficiency)
     if effcat=="fit_eff":
-        list_=f_in.Get("Probes/lct_effV").GetListOfKeys()
+        list_=f_in.Get("Probes/"+path).GetListOfKeys()
         ikey=list_.First()
         while (ikey!=list_.After(list_.Last())):
             dirname_=ikey.GetName()
@@ -95,17 +97,15 @@ def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname)
             if binnumber:
                 ibin=int(binnumber.group(1))
                 if ibin<nbins:
-                    result_=f_in.Get("Probes/lct_effV/"+dirname_+"/fitresults").floatParsFinal().find("efficiency")
+                    result_=f_in.Get("Probes/"+path+"/"+dirname_+"/fitresults").floatParsFinal().find("efficiency")
                     yerrlo[ibin]=abs(result_.getErrorLo())
                     yerrhi[ibin]=result_.getErrorHi()
             ikey = list_.After(ikey);
-    #3 - fill the correct x values from the binning 
+    #4 - fill the correct x values from the binning 
     exec( "bins=%sbin%s"%(binning,str(st_) if binning=="eta" else "") )
     for ibin in range(nbins):
         xval[ibin]=(bins[ibin]+bins[ibin+1])/2
         xerr[ibin]=abs(bins[ibin+1]-bins[ibin])/2
-    #4 - the y values are correct
-    Y=plot_.GetY()
     #5 - remake the TGraph
     outputplot=TGraphAsymmErrors(nbins, xval, Y, xerr, xerr, yerrlo, yerrhi)
     outputplot.SetName(f_in.GetName().replace(Prefix+TagProbeFitResult,"")[:-5]+path)
@@ -115,10 +115,10 @@ def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname)
     outputplot.GetYaxis().SetTitleOffset(1.2)
     outputplot.SetMarkerStyle(8)
     outputplot.SetMarkerSize(.5)
-    #EffCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
-    #EffCanvas.cd()
-    #outputplot.Draw("AP")
-    #raw_input("pause")
+#    EffCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
+#    EffCanvas.cd()
+#    outputplot.Draw("AP")
+#    raw_input("pause")
     return outputplot
 
 if "Stations" in Group:
@@ -156,9 +156,13 @@ if "Stations" in Group:
     SegEff.SetMinimum(90)
     LCTEff.SetMaximum(100)
     LCTEff.SetMinimum(90)
+    SegEff.SetMarkerStyle(8)
+    SegEff.SetMarkerSize(.5)
     SegEff.Draw("AP")
     LCTCanvas=TCanvas("lct efficiency","lct efficiency",500,500)
     LCTCanvas.cd()
+    LCTEff.SetMarkerStyle(8)
+    LCTEff.SetMarkerSize(.5)
     LCTEff.Draw("AP")
     for st in range(1,n_stations+1):
        binnum=SegEff.GetXaxis().FindBin(st)
