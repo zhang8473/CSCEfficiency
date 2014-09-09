@@ -74,7 +74,7 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
    from SimGeneral.MixingModule.mix_2012_Startup_50ns_PoissonOOTPU_cfi import mix
    pileup_mc=mix.input.nbPileupEvents.probValue
    </pre>
-  8. Station categorizing method: `station` is a python dictionary. The format of each component in the dictionary is "key(index):(logic expression in C style,name,color,station number)". e.g.,
+  8. Station categorizing method: variable `station` is a python dictionary. The format of each component in the dictionary is "key(index):(logic expression in C style,name,color,station number)". e.g.,
    <pre>
    stations={
     ......
