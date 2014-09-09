@@ -3,6 +3,8 @@
 
 ## About
 --- tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
+* It is based on the tag-and-probe method using the Z pole or the J/$\Psi$ pole;
+* The efficiency obtained is the CSC detector efficiency times the efficiency that the muon is not scattered.
 
 ## Table of Contents
 - [Table of Contents](#table-of-contents)
@@ -40,15 +42,15 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 
 ## Make the efficiency plots
 1. Setup  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
-   1. Data or MC:
+   1. Setup for Data or for MC:
    <pre>
     RunOnMC=False # or True
    </pre>
-   2. Use Z resonance or J/Psi resonance:
+   2. Setup using Z resonance or using J/Psi resonance:
    <pre>
    Resonance="Z" # or "JPsi"
    </pre>
-   3. How to categorize the data:
+   3. Setup how to categorize the data:
    <pre>
    Group="Stations" #x axis: stations; y axis: efficiency
    #options are
@@ -76,15 +78,16 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
       <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations</td>
     </tr>
    </table> 
-   4. Temporary output file (you may change the path but not the file name): 
+   4. Arrange space for the temporary file (you may change the path but not the file name): 
       It may take two times the size of the Ntuple file space. The variable is `TemporaryOutputFile`. By default,        it will use the linux temporary path: /tmp/.
    5. Tag and probe file (do not need to change): The variable is `TagProbeFitResult`.
    6. result file (do not need to change): The variable is `ResultPlotsFileName`.
-   7. For simulation sample, setup the pileup weight file `DataPileupRootFileName`. This is the file made by [estimatePileup2.py](https://cmssdt.cern.ch/SDT/lxr/source/RecoLuminosity/LumiDB/scripts/estimatePileup2.py) in CMSSW. The `pileup_mc` is the pileup weight used to generate the simulation sample, one can get it directly from the CMSSW package, for example:
+   7. **Setup the pileup reweighting scheme for simulation sample**: The variable of the data pileup weight file is  `DataPileupRootFileName`. This is the file made by [estimatePileup2.py](https://cmssdt.cern.ch/SDT/lxr/source/RecoLuminosity/LumiDB/scripts/estimatePileup2.py) in CMSSW. One can see [the twiki page](https://twiki.cern.ch/twiki/bin/view/CMS/PileupMCReweightingUtilities) to learn how to make such file corresponding to data. The `pileup_mc` is the pileup weight used to generate the simulation sample, one can get it directly from the CMSSW package, for example:
    <pre>
    from SimGeneral.MixingModule.mix_2012_Startup_50ns_PoissonOOTPU_cfi import mix
    pileup_mc=mix.input.nbPileupEvents.probValue
    </pre>
+   The mixing module used for each MC sample is described in [the pileup information twiki page](https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupInformation).
   8. Station categorizing method: variable `station` is a python dictionary. The format of each component in the dictionary is "key(index):(logic expression in C style,name,color,station number)". e.g.,
    <pre>
    stations={
