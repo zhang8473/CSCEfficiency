@@ -38,7 +38,7 @@ process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 
 2. Run [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py) using Crab or locally. After all jobs finished, combine the output root files into one:
 <pre>
-hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
+hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 </pre>
 
 ## Make the Efficiency plots
