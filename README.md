@@ -3,7 +3,7 @@
 
 ## About
 --- tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
-* It is based on the tag-and-probe method using the Z pole or the J/$\Psi$ pole;
+* It is based on the tag-and-probe method using the Z pole or the J/ψ pole;
 * The efficiency obtained is the CSC detector efficiency times the efficiency that the muon is not scattered.
 
 ## Table of Contents
@@ -46,7 +46,7 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
    <pre>
     RunOnMC=False # or True
    </pre>
-   2. Setup using Z resonance or using J/Psi resonance:
+   2. Setup using Z resonance or using J/ψ resonance:
    <pre>
    Resonance="Z" # or "JPsi"
    </pre>
