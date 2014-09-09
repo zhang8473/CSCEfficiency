@@ -5,6 +5,7 @@
 --- tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
 * It is based on the tag-and-probe method using the Z pole or the J/ψ pole;
 * The efficiency obtained is the CSC detector efficiency times the efficiency that the muon is not scattered.
+* Need RAW information to get the LCT efficiency. RECO or AOD sample is not good.
 
 ## Table of Contents
 - [Table of Contents](#table-of-contents)
