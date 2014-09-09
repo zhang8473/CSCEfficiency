@@ -64,7 +64,7 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
       <td>"Stations"</td><td>stations</td><td>efficiency</td><td></td>
     </tr>
     <tr>
-      <td>"Chambers"</td><td>chamber number</td><td>stations</td><td>efficiency</td>
+      <td>"Chambers"</td><td>chamber number</td><td>rings</td><td>efficiency</td>
     </tr>
     <tr>
       <td>"Stationspt"</td><td>pt in GeV</td><td>efficiency</td><td></td><td>make a plot for each station</td>
