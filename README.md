@@ -41,13 +41,10 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
    <pre>
    Group="Stations" #x axis: stations; y axis: efficiency
    #options are
-   #"Stationspt": x axis: chamber number; y axis: stations; z axis: efficiency
-   #"Stationseta","Stationsphi"
-   ,"pt","eta","phi",
    </pre>
    <table style="width:100%"  align="center">
     <tr>
-      <th> Group </th><th> x axis </th><td>y axis</td><td>z axis</td><td> Comments</td>
+      <th> Group </th><th> x axis </th><th>y axis</th><th>z axis</th><th> Comments</th>
     </tr>
     <tr>
       <td>"Stations"</td><td>stations</td><td>efficiency</td><td></td>
@@ -57,6 +54,9 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
     </tr>
     <tr>
       <td>"Stationspt"</td><td>pt in GeV</td><td>efficiency</td><td></td><td>make a plot for each station</td>
+    </tr>
+    <tr>
+      <td>"Stationseta"</td><td>|&eta|</td><td>efficiency</td><td></td><td>make a plot for each station</td>
     </tr>
    </table> 
    4. Temporary output file: 
