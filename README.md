@@ -96,9 +96,19 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
     2:("( CSCRg1==1 )","ME11B",kRed-9,1),
     ......}
    </pre>
-2. <pre> python Step1.py Ntuple.root </pre>
+2. Categorize the data and run the tag-and-probe package in CMSSW:
+   <pre> python Step1.py Ntuple.root </pre>
 3. Wait until all jobs finished. Use `ps -f` to check.
-4. <pre> python Step2_PlotAll.py </pre>
+4. Make the plot:
+   <pre> python Step2_PlotAll.py </pre>
+   Advanced Usage of [Step2_PlotAll.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Step2_PlotAll.py):
+   <pre> python Step2_PlotAll.py arg1 arg2 </pre>
+   * arg1 is directory of the files given by the TagandProbe cmssw package. The file names have to match what is defined in Config.py;
+   * arg2 "lct_effV"+arg2 and "seg_effV"+arg2 are the directory name in the TagandProbe result file. arg2 can be specified as "bkg" or "sig" for background and signal modeling;
+   * Example1(plot default efficiencies): python Step2_PlotAll.py
+   * Example2(for systematic -- bkg modeling): python Step2_PlotAll.py /uscms/home/zhangjin/nobackup/ bkg
+   * Example3(for systematic -- sig modeling): python Step2_PlotAll.py /uscms/home/zhangjin/nobackup/ sig
+   * Example4(MCTruth): python Step2_PlotAll.py /uscms/home/zhangjin/nobackup/ mc
 5. Plots are in the result root file
 
 ## Organize the Result Plots
