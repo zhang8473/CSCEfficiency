@@ -65,8 +65,16 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
       <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations</td>
     </tr>
    </table> 
-   4. Temporary output file: 
+   4. Temporary output file (you may change the path but not the file name): 
       It may take two times the size of the Ntuple file space. The variable is `TemporaryOutputFile`. By default,        it will use the linux temporary path: /tmp/.
+   5. Tag and probe file (do not need to change): The variable is `TagProbeFitResult`.
+   6. result file (do not need to change): The variable is `ResultPlotsFileName`.
+   7. For simulation sample, setup the pileup weight file `DataPileupRootFileName`. This is the file made by [estimatePileup2.py](https://cmssdt.cern.ch/SDT/lxr/source/RecoLuminosity/LumiDB/scripts/estimatePileup2.py) in CMSSW. The `pileup_mc` is the pileup weight used to generate the simulation sample, one can get it directly from the CMSSW package, for example:
+   <pre>
+   from SimGeneral.MixingModule.mix_2012_Startup_50ns_PoissonOOTPU_cfi import mix
+   pileup_mc=mix.input.nbPileupEvents.probValue
+   </pre>
 2. <pre> python Step1.py Ntuple.root </pre>
-3. 
-
+3. Wait until all jobs finished. Use `ps -f` to check.
+4. <pre> python Step2_PlotAll.py </pre>
+5. Plots are in the result root file
