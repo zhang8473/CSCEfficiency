@@ -24,9 +24,43 @@ process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 
 3. Run [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py) using Crab or locally. After all jobs finished, combine the output root files into one:
 <pre>
-hadd Ntuple.root AllRetrievedJobs*.root
+hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 </pre>
 
-## Make station efficiency plots using Z peak
-
+## Make the efficiency plots
+1. Setup  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
+   1. Data or MC:
+   <pre>
+    RunOnMC=False
+   </pre>
+   2. Use Z resonance or J/Psi resonance:
+   <pre>
+   Resonance="Z"#options are "Z","JPsi"
+   </pre>
+   3. How to categorize the data:
+   <pre>
+   Group="Stations" #x axis: stations; y axis: efficiency
+   #options are
+   #"Stationspt": x axis: chamber number; y axis: stations; z axis: efficiency
+   #"Stationseta","Stationsphi"
+   ,"pt","eta","phi",
+   </pre>
+   <table style="width:100%"  align="center">
+    <tr>
+      <th> Group </th><th> x axis </th><td>y axis</td><td>z axis</td><td> Comments</td>
+    </tr>
+    <tr>
+      <td>"Stations"</td><td>stations</td><td>efficiency</td><td></td>
+    </tr>
+    <tr>
+      <td>"Chambers"</td><td>chamber number</td><td>stations</td><td>efficiency</td>
+    </tr>
+    <tr>
+      <td>"Stationspt"</td><td>pt in GeV</td><td>efficiency</td><td></td><td>make a plot for each station</td>
+    </tr>
+   </table> 
+   4. Temporary output file: 
+      It may take two times the size of the Ntuple file space. The variable is `TemporaryOutputFile`. By default,        it will use the linux temporary path: /tmp/.
+2. <pre> python Step1.py Ntuple.root </pre>
+3. 
 
