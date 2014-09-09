@@ -1,7 +1,7 @@
 # CSC Primitive Efficiency Measurement Package
--- tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
 =============
-
+tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
+=============
 ## Make the Ntuple
 1. Installation:
 <pre>
