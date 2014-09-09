@@ -11,10 +11,11 @@
     - [About](#about)
     - [Installation](#installation)
     - [Make the Ntuple](#make-the-ntuple)
-    - [Example](#example)
-    - [Limitations](#limitations)
+    - [Make the Efficiency Plots](#make-the-efficiency-plots)
+    - [Organize the Result Plots](#organize-the-result-plots)
+    - [Study the Variables in the Ntuple](#study-the-variables-in-the-ntuple)
    
-## Installation:
+## Installation
 <pre>
 cd CMSSW_5_x_x
 cmsenv
@@ -40,7 +41,7 @@ process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 </pre>
 
-## Make the efficiency plots
+## Make the Efficiency plots
 1. Setup  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
    1. Setup for Data or for MC:
    <pre>
@@ -100,7 +101,9 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 4. <pre> python Step2_PlotAll.py </pre>
 5. Plots are in the result root file
 
-## Organizing Result Plots:
+## Organize the Result Plots
 * [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/DATAMCPlot.py)
 
-## Distance Matching Study
+## Study the Variables in the Ntuple (e.g. the distance between the track and the LCT/segment)
+* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/MatchStudy.py)
+
