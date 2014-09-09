@@ -102,8 +102,9 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 5. Plots are in the result root file
 
 ## Organize the Result Plots
-* [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/DATAMCPlot.py)
+To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/DATAMCPlot.py).
 
-## Study the Variables in the Ntuple (e.g. the distance between the track and the LCT/segment)
+## Study the Variables in the Ntuple
+With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
 * [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/MatchStudy.py)
 
