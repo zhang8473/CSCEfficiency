@@ -74,7 +74,7 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
    from SimGeneral.MixingModule.mix_2012_Startup_50ns_PoissonOOTPU_cfi import mix
    pileup_mc=mix.input.nbPileupEvents.probValue
    </pre>
-  8. Station category: `station` is a python dictionary. The format of each component in the dictionary is "key(index):(logic expression in C style,name,color,station number)". e.g.,
+  8. Station categorizing method: `station` is a python dictionary. The format of each component in the dictionary is "key(index):(logic expression in C style,name,color,station number)". e.g.,
    <pre>
    stations={
     ......
@@ -85,3 +85,8 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 3. Wait until all jobs finished. Use `ps -f` to check.
 4. <pre> python Step2_PlotAll.py </pre>
 5. Plots are in the result root file
+
+## Organizing Result Plots:
+* [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/DATAMCPlot.py)
+
+## Distance Matching Study
