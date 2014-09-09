@@ -5,10 +5,10 @@
 --- tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
 
 ## Table of Contents
-- [Table of Contents Generator](#table-of-contents-generator)
+- [Table of Contents](#table-of-contents)
     - [About](#about)
     - [Installation](#installation)
-    - [Usage](#usage)
+    - [Make the Ntuple](#make-the-ntuple)
     - [Example](#example)
     - [Limitations](#limitations)
    
