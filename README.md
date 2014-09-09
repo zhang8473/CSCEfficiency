@@ -1,8 +1,18 @@
 # CSC Primitive Efficiency Measurement Package
+====================
+
+## About
 --- tested in CMSSW_5_x_x, not tested in CMSSW_6_x_x
 
-## Make the Ntuple
-1. Installation:
+## Table of Contents
+- [Table of Contents Generator](#table-of-contents-generator)
+    - [About](#about)
+    - [Installation](#installation)
+    - [Usage](#usage)
+    - [Example](#example)
+    - [Limitations](#limitations)
+   
+## Installation:
 <pre>
 cd CMSSW_5_x_x
 cmsenv
@@ -12,7 +22,8 @@ git clone git@github.com:zhang8473/CSCEfficiency.git
 scramv1 b
 </pre>
 
-2. Config the variable `datatype` in [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py): 
+## Make the Ntuple
+1. Config the variable `datatype` in [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py): 
 <pre>datatype="RAW"#
 #Candidates are for data: "RAW" "RAW-RECO" "FEVT"
 #for mc: in order of suggestions: "GEN-RAWDEBUG"(mc) "GEN-SIM-RAW"(mc) "GEN-RAW"(mc) "GEN-SIM"
@@ -22,7 +33,7 @@ The The default output file name is 'CSCPFG_Ineff_DATA.root' ---
 process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 </pre>
 
-3. Run [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py) using Crab or locally. After all jobs finished, combine the output root files into one:
+2. Run [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py) using Crab or locally. After all jobs finished, combine the output root files into one:
 <pre>
 hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 </pre>
