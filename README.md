@@ -56,7 +56,13 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
       <td>"Stationspt"</td><td>pt in GeV</td><td>efficiency</td><td></td><td>make a plot for each station</td>
     </tr>
     <tr>
-      <td>"Stationseta"</td><td>|&eta|</td><td>efficiency</td><td></td><td>make a plot for each station</td>
+      <td>"Stationseta"</td><td>|η|</td><td>efficiency</td><td></td><td>make a plot for each station</td>
+    </tr>
+    <tr>
+      <td>"Stationsphi"</td><td>ϕ</td><td>efficiency</td><td></td><td>make a plot for each station</td>
+    </tr>
+    <tr>
+      <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations</td>
     </tr>
    </table> 
    4. Temporary output file: 
