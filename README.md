@@ -31,11 +31,11 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
 1. Setup  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
    1. Data or MC:
    <pre>
-    RunOnMC=False
+    RunOnMC=False # or True
    </pre>
    2. Use Z resonance or J/Psi resonance:
    <pre>
-   Resonance="Z"#options are "Z","JPsi"
+   Resonance="Z" # or "JPsi"
    </pre>
    3. How to categorize the data:
    <pre>
@@ -73,6 +73,13 @@ hadd CSCPFG_Ineff_DATA.root CSCPFG_Ineff_DATA*.root
    <pre>
    from SimGeneral.MixingModule.mix_2012_Startup_50ns_PoissonOOTPU_cfi import mix
    pileup_mc=mix.input.nbPileupEvents.probValue
+   </pre>
+  8. Station category: `station` is a python dictionary. The format of each component in the dictionary is "key(index):(logic expression in C style,name,color,station number)". e.g.,
+   <pre>
+   stations={
+    ......
+    2:("( CSCRg1==1 )","ME11B",kRed-9,1),
+    ......}
    </pre>
 2. <pre> python Step1.py Ntuple.root </pre>
 3. Wait until all jobs finished. Use `ps -f` to check.
