@@ -53,15 +53,21 @@ if len(args)>0:
 
 file_out=TFile.Open(ResultPlotsFileName,'RECREATE')
 
+etascheme="abseta"
+#etascheme="tracks_eta"
+#phischeme="shiftedphi"
+phischeme="tracks_phi"
 if "pt" in Group:
     binning="pt"
-    plotname="tracks_pt_PLOT_tracks_eta_bin0_&_tracks_phi_bin0"
+    plotname="tracks_pt_PLOT_"+etascheme+"_bin0_&_"+phischeme+"_bin0"
 elif "eta" in Group:
     binning="eta"
-    plotname="tracks_eta_PLOT_tracks_phi_bin0_&_tracks_pt_bin0"
+    plotname=etascheme+"_PLOT_"+phischeme+"_bin0_&_tracks_pt_bin0"
 elif "phi" in Group:
     binning="phi"
-    plotname="tracks_phi_PLOT_tracks_eta_bin0_&_tracks_pt_bin0"
+    plotname=phischeme+"_PLOT_"+etascheme+"_bin0_&_tracks_pt_bin0"
+else:
+    plotname=phischeme+"_bin0__"+etascheme+"_bin0__tracks_pt_bin0__VoigtianPlusExpo"
 
 if Postfix=="_MCTruth":
     plotname+="_&_mcTrue_true"
@@ -76,8 +82,11 @@ def GetEff(f_in,path="lct_effV",effcat="fit_eff"):
 
 def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname):
     canvas_=f_in.Get("Probes/"+path+"/"+effcat+"_plots/"+name_)
+    if not canvas_:
+        print "\033[91m Warning: Probes/"+path+"/"+effcat+"_plots/"+name_," does not exist in",f_in.GetName(),"\033[0m"
+        return NULL
     dummyplot_=canvas_.GetListOfPrimitives().At(0)
-    plot_=canvas_.FindObject("hxy_fit_eff").Clone();
+    plot_=canvas_.FindObject("hxy_"+effcat).Clone();
     #we are going to fix the bugs in tagandprobe package in the following code
     #1 - recreate the arrays
     nbins=plot_.GetN()
@@ -87,7 +96,14 @@ def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname)
     yerrlo=zeros(nbins, dtype=float)
     #2 - the y values are correct
     Y=plot_.GetY()
-    #3 - fill the yerror bars from the correct input (only for fit efficiency)
+    #3 - find the corresponding first bin in the predefined bins for the plot_ first bin0
+    exec( "bins=%sbin%s"%(binning,str(st_) if binning=="eta" else "") )
+    X=plot_.GetX()
+    for abin in bins:
+        if X[0]<abin:
+            firstbin=bins.index(abin)-1
+            break
+    #4 - fill the yerror bars from the correct input (only for fit efficiency)
     if effcat=="fit_eff":
         list_=f_in.Get("Probes/"+path).GetListOfKeys()
         ikey=list_.First()
@@ -95,30 +111,48 @@ def GetBinnedEffPlot(f_in,path="lct_effV",effcat="fit_eff",st_=0,name_=plotname)
             dirname_=ikey.GetName()
             binnumber=re.match(".*"+binning+"_bin(\d*)_.*",dirname_)
             if binnumber:
-                ibin=int(binnumber.group(1))
-                if ibin<nbins:
-                    result_=f_in.Get("Probes/"+path+"/"+dirname_+"/fitresults").floatParsFinal().find("efficiency")
-                    yerrlo[ibin]=abs(result_.getErrorLo())
-                    yerrhi[ibin]=result_.getErrorHi()
+                ibin=int(binnumber.group(1))-firstbin
+                if ibin<nbins and ibin>=0:
+                    result_=f_in.Get("Probes/"+path+"/"+dirname_+"/fitresults")
+                    if result_:
+                        value_=result_.floatParsFinal().find("efficiency")
+                        yerrlo[ibin]=abs(value_.getErrorLo())
+                        yerrhi[ibin]=value_.getErrorHi()
+                        """
+                        if Y[ibin]!=value_.getVal(): #show differences (should less than 1E-6)
+                            print Y[ibin],
+                            value_.Print()
+                        """
+                        if Y[ibin]<0.999 and yerrhi[ibin]<1E-7:
+                            yerrhi[ibin]=yerrlo[ibin] #sometime the result misses the high error, we make an approximation: ErrorHi=ErrorLo in this case
+                        if Y[ibin]+yerrhi[ibin]>1.:
+                            yerrhi[ibin]=1.-Y[ibin] # it happens sometime when ErrorHi=ErrorLo
             ikey = list_.After(ikey);
-    #4 - fill the correct x values from the binning 
-    exec( "bins=%sbin%s"%(binning,str(st_) if binning=="eta" else "") )
+    #5 - fill the correct x values from the binning 
     for ibin in range(nbins):
-        xval[ibin]=(bins[ibin]+bins[ibin+1])/2
-        xerr[ibin]=abs(bins[ibin+1]-bins[ibin])/2
-    #5 - remake the TGraph
+        xval[ibin]=(bins[ibin+firstbin]+bins[ibin+firstbin+1])/2.
+        xerr[ibin]=abs(bins[ibin+firstbin+1]-bins[ibin+firstbin])/2.
+    #6 - remake the TGraph
+    plotname_=f_in.GetName().replace(Prefix+TagProbeFitResult,"")[:-5]+path
     outputplot=TGraphAsymmErrors(nbins, xval, Y, xerr, xerr, yerrlo, yerrhi)
-    outputplot.SetName(f_in.GetName().replace(Prefix+TagProbeFitResult,"")[:-5]+path)
+    outputplot.SetName(plotname_)
     outputplot.SetTitle(outputplot.GetName())
     outputplot.GetXaxis().SetTitle(dummyplot_.GetXaxis().GetTitle())
     outputplot.GetYaxis().SetTitle(dummyplot_.GetYaxis().GetTitle())
     outputplot.GetYaxis().SetTitleOffset(1.2)
-    outputplot.SetMarkerStyle(8)
-    outputplot.SetMarkerSize(.5)
-#    EffCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
-#    EffCanvas.cd()
-#    outputplot.Draw("AP")
-#    raw_input("pause")
+    #outputplot.SetMarkerStyle(8)
+    #outputplot.SetMarkerSize(.5)
+    """
+    outputplot.SetMinimum(0.9)
+    outputplot.SetMaximum(1.0)
+    EffCanvas=TCanvas(plotname_,plotname_,500,500)
+    EffCanvas.cd()
+    if binning=="pt":
+        outputplot.GetXaxis().SetLimits(10., 100.);
+    #gPad.SetLogx()
+    outputplot.Draw("AP")
+    raw_input("pause")
+    """
     return outputplot
 
 if "Stations" in Group:
@@ -132,18 +166,22 @@ if "Stations" in Group:
         f_in=TFile(filename_,"READ");
         if Postfix=="_MCTruth":
             Effs.append( GetEff(f_in, "lct_effV"+Postfix,"cnt_eff")+GetEff(f_in,"seg_effV"+Postfix,"cnt_eff") )
-            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",stations[idx][1])
-            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",stations[idx][1])
+            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",stations[idx][3])
+            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",stations[idx][3])
             file_out.cd()
-            LCTPlot.Write()
-            SEGPlot.Write()
+            if LCTPlot:
+                LCTPlot.Write()
+            if SEGPlot:
+                SEGPlot.Write()
         else:
             Effs.append( GetEff(f_in, "lct_effV"+Postfix,"fit_eff")+GetEff(f_in,"seg_effV"+Postfix,"fit_eff" ) )
-            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",stations[idx][1])
-            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",stations[idx][1])
+            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",stations[idx][3])
+            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",stations[idx][3])
             file_out.cd()
-            LCTPlot.Write()
-            SEGPlot.Write()
+            if LCTPlot:
+                LCTPlot.Write()
+            if SEGPlot:
+                SEGPlot.Write()
         f_in.Close()
     Effs=array(Effs).transpose()*100.
     xval=array(range(1,n_stations+1))*1.0
@@ -252,14 +290,18 @@ else:
             LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",1)
             SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",1)
             file_out.cd()
-            LCTPlot.Write()
-            SEGPlot.Write()
+            if LCTPlot:
+                LCTPlot.Write()
+            if SEGPlot:
+                SEGPlot.Write()
         else:
             LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",1)
             SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",1)
             file_out.cd()
-            LCTPlot.Write()
-            SEGPlot.Write()
+            if LCTPlot:
+                LCTPlot.Write()
+            if SEGPlot:
+                SEGPlot.Write()
         f_in.Close()
-raw_input("Plots are saved in "+ResultPlotsFileName+". Press ENTER to exit")
+#raw_input("Plots are saved in "+ResultPlotsFileName+". Press ENTER to exit")
 file_out.Close()

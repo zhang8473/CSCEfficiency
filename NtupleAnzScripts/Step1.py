@@ -35,19 +35,21 @@ else:
 segSelect=[""]*4
 lctSelect=[""]*4
 
-#add branch abseta and weight
+#add branch abseta, shiftedphi, and weight
 print "Now adding:\n abseta,\n weight",
 abseta = zeros(1, dtype=float)
 absetaBranch = tree_in.Branch('abseta',abseta, 'abseta/D')
+shiftedphi = zeros(1, dtype=float)
+shiftedphiBranch = tree_in.Branch('shiftedphi',shiftedphi, 'shiftedphi/D')
 weight = zeros(1, dtype=float)
 weightBranch = tree_in.Branch('weight',weight, 'weight/D')
 if RunOnMC:
-  #add branch isTrueMuMuPair for MC
-  print ",\n isTrueMuMuPair:"
+  #add branch mcTrue for MC
+  print ",\n mcTrue:"
   MCTruth_=ConvertCLogicalExp(MCTruth).replace("MuTag"," tree_in_dummy.MuTag").replace(" track"," tree_in_dummy.track")
   print "\t MC truth criteria: \n",MCTruth_,","
-  isTrueMuMuPair = zeros(1, dtype=int)
-  isTrueMuMuPairBranch = tree_in.Branch('isTrueMuMuPair',isTrueMuMuPair, 'isTrueMuMuPair/I')
+  mcTrue = zeros(1, dtype=int)
+  mcTrueBranch = tree_in.Branch('mcTrue',mcTrue, 'mcTrue/I')
 else:
   print "(=1),"
 
@@ -74,9 +76,10 @@ print "local charged trigger selection criteria: \n",lctSelect
 for n in range(tree_in_dummy.GetEntries()):
   tree_in_dummy.GetEntry(n)
   abseta[0] = abs(tree_in_dummy.tracks_eta)
+  shiftedphi[0] = tree_in_dummy.tracks_phi if tree_in_dummy.tracks_phi<6.1959188464 else tree_in_dummy.tracks_phi-6.28318530718
   if RunOnMC:
     weight[0] = tree_in_dummy.mcweight*puweight[int(tree_in_dummy.numberOfPUVerticesMixingTruth)]*sampleweight
-    exec ( "isTrueMuMuPair[0] = 1 if %s else 0"%(MCTruth_) )
+    exec ( "mcTrue[0] = 1 if %s else 0"%(MCTruth_) )
   else:
     weight[0] = 1.
   if "Stations" not in Group and "Chambers" not in Group:
