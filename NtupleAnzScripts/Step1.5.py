@@ -4,6 +4,7 @@
 #It only does the tagandprobe fit, in case that the classified Ntuple files have been made)"
 from Config import *
 
+import os,subprocess
 def Fit(filename_,st_):
   if os.path.isfile(filename_):
       cmd="nohup cmsRun TagandProbe.py %s %d &"%(filename_,st_)
