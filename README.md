@@ -122,7 +122,6 @@ python DATAMCPlot.py datafile mcfile plotname
 * plotname is the name of the plot saved in the result root file, e.g. "ME12+13seg_effV" for segment efficiency or "ME12+13lct_effV" for lct efficiency.
 
 ## Study the Variables in the Ntuple
-With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
-* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) is for stations
-* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) is for one or multiple chambers.
-
+This part is only for **experts** who want to find out a problem or know more. Here only list a breif discription for each script because **experts** are able to read the python script themselves. With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
+* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) can be used to study the variables in category of stations. While using this, the `Group` should be set to "Stations" in [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
+* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) is can be used to study the variables in category of chambers. While using this, the `Group` should be set to "Chambers" in [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
