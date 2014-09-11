@@ -113,8 +113,13 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 5. Plots are in the result root file
 
 ## Organize the Result Plots
-To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/DATAMCPlot.py).
-
+To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/DATAMCPlot.py). It oragnizes the plots made by [Step2_PlotAll.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Step2_PlotAll.py). The usage is
+<pre>
+python DATAMCPlot.py datafile mcfile plotname
+</pre>
+* datafile is the result root file for data;
+* mcfile is the result root file for mc. If the keyword `MCTruth` appears in the file name, the simulation couting efficiency for real muons will be plotted. In that case, the plotname will be changed to plotname+"_MCTruth" automatically in the script. So one should still use the same plotname while calculating MCTruth.
+* plotname is the name of the plot saved in the result root file, e.g. "ME12+13seg_effV" for segment efficiency or "ME12+13lct_effV" for lct efficiency.
 ## Study the Variables in the Ntuple
 With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
 * [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) is for stations
