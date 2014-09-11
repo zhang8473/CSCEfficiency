@@ -115,7 +115,7 @@ def SaveandFit(tree_,cut_,filename_,st_):
     outputfile.Close()
     Fit(filename_,st_)
   else:
-    print "No muon is expected to pass",name_+"."
+    print "No muon is expected to pass",filename_+"."
     outputfile.Close()
     os.system( "rm "+filename_ )
     return
