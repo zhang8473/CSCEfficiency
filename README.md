@@ -32,7 +32,7 @@ scramv1 b
 #Candidates are for data: "RAW" "RAW-RECO" "FEVT"
 #for mc: in order of suggestions: "GEN-RAWDEBUG"(mc) "GEN-SIM-RAW"(mc) "GEN-RAW"(mc) "GEN-SIM"
 </pre>
-The The default output file name is 'CSCPFG_Ineff_DATA.root' ---
+The default output file name is 'CSCPFG_Ineff_DATA.root' ---
 <pre>
 process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 </pre>
