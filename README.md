@@ -117,11 +117,11 @@ To combine the data and MC results into one plot, one can use [DATAMCPlot.py](ht
 <pre>
 python DATAMCPlot.py datafile mcfile plotname
 </pre>
-* datafile is the result root file for data;
-* mcfile is the result root file for mc. If the keyword `MCTruth` appears in the file name, the simulation couting efficiency for real muons will be plotted. In that case, the plotname will be changed to plotname+"_MCTruth" automatically in the script. So one should still use the same plotname while calculating MCTruth.
+* datafile is the result root file from data;
+* mcfile is the result root file from simulation. If the keyword `MCTruth` appears in the file name, the simulation couting efficiency for real muons will be plotted. In that case, the plotname will be changed to plotname+"_MCTruth" automatically in the script. So one should still use the same plotname while calculating MCTruth.
 * plotname is the name of the plot saved in the result root file, e.g. "ME12+13seg_effV" for segment efficiency or "ME12+13lct_effV" for lct efficiency.
 
-I suggest to put the datafile and mcfile in different directories. This script will use the  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py) in the datafile directory. If no Config.py or no \__init\__.py is found in the datafile directory, it will use the Config.py in the current directory.
+I suggest to put the datafile and the mcfile in different directories. This script will use the  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py) in the datafile directory. If no Config.py or no \__init\__.py is found in the datafile directory, it will use the Config.py in the current directory.
 
 ## Study the Variables in the Ntuple
 This part is only for **experts** who want to find out a problem or know more. Here only list a breif discription for each script because **experts** are able to read the python script themselves. With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
