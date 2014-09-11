@@ -113,10 +113,10 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 5. Plots are in the result root file
 
 ## Organize the Result Plots
-To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/DATAMCPlot.py).
+To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/DATAMCPlot.py).
 
 ## Study the Variables in the Ntuple
 With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
-* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/MatchStudy.py) is for stations
-* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/SysCal_ExpertsOnly/MatchStudy_Chamber.py) is for one or multiple chambers.
+* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) is for stations
+* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) is for one or multiple chambers.
 
