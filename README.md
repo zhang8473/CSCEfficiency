@@ -77,7 +77,7 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
       <td>"Stationsphi"</td><td>ϕ</td><td>efficiency</td><td></td><td>make a plot for each station</td>
     </tr>
     <tr>
-      <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations</td>
+      <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations, not tested yet</td>
     </tr>
    </table> 
    4. Arrange space for the temporary file (you may change the path but not the file name): 
