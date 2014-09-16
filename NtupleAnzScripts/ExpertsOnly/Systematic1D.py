@@ -14,20 +14,25 @@ import sys
 if (sys.argv[0] == "python"): args=sys.argv[2:]
 else: args=sys.argv[1:]
 
-if AnalyzeZPeak:
-    Data_default="DATA_Sta_Def/resultplots.root"
-    Data_bkgModel="DATA_Sta_Def/resultplots_BkgModeling.root"
-    Data_sigModel="DATA_Sta_Def/resultplots_SigModeling.root"
-    Data_CloseByMu="DATA_Sta_CloseByMu/resultplots.root"
-    Data_LooseProbe="DATA_Sta_LooseProbe/resultplots.root"
-    MC_default="MC_Sta_Def/resultplots.root"
-    MC_Counting="MC_Sta_Def/resultplots_Counting.root"
+if Resonance is "Z":
+    Data_default="data_Z_Stations/resultplots_data_Z_Stations.root"
+    Data_bkgModel="data_Z_Stations/resultplots_data_Z_Stations_BkgModeling.root"
+    Data_sigModel="data_Z_Stations/resultplots_data_Z_Stations_SigModeling.root"
+    Data_lct_default="data_lct_Z_Stations/resultplots_data_lct_Z_Stations.root"
+    Data_lct_bkgModel="data_lct_Z_Stations/resultplots_data_lct_Z_Stations_BkgModeling.root"
+    Data_lct_sigModel="data_lct_Z_Stations/resultplots_data_lct_Z_Stations_SigModeling.root"
+#    Data_CloseByMu="DATA_Sta_CloseByMu/resultplots.root"
+#    Data_LooseProbe="DATA_Sta_LooseProbe/resultplots.root"
+    MC_default="mc_Z_Stations/resultplots_mc_Z_Stations.root"
+    MC_Counting="mc_Z_Stations/resultplots_mc_Z_Stations_MCTruth.root"
+    MC_lct_default="mc_lct_Z_Stations/resultplots_mc_lct_Z_Stations.root"
+    MC_lct_Counting="mc_lct_Z_Stations/resultplots_mc_lct_Z_Stations_MCTruth.root"
 else:
     Data_default="DATA_Sta_Def/resultplots_JPsi.root"
     Data_bkgModel="DATA_Sta_Def/resultplots_JPsi_BkgModeling.root"
     Data_sigModel="DATA_Sta_Def/resultplots_JPsi_SigModeling.root"
-    Data_CloseByMu="DATA_Sta_CloseByMu/resultplots_JPsi.root"
-    Data_LooseProbe="DATA_Sta_LooseProbe/resultplots_JPsi.root"
+#    Data_CloseByMu="DATA_Sta_CloseByMu/resultplots_JPsi.root"
+#    Data_LooseProbe="DATA_Sta_LooseProbe/resultplots_JPsi.root"
     MC_default="MC_Sta_Def/resultplots_JPsi.root"
     MC_Counting="MC_Sta_Def/resultplots_JPsi_Counting.root"    
 
@@ -66,7 +71,7 @@ def DiffBetweenPlots(file1,file2,plotname,sysname="sys"):
     print
     return p
 
-def Systematic(ListofPlots,Stat,sysname="sys_tot"):
+def Systematic(ListofPlots,Stat,OtherSys=0.,sysname="sys_tot"):
     print "Summary :",
     for iplot in ListofPlots:
         print "\n",iplot.GetTitle(),"&",
@@ -80,10 +85,11 @@ def Systematic(ListofPlots,Stat,sysname="sys_tot"):
         sumover=0
         for iplot in ListofPlots:
             sumover+=iplot.GetBinContent(x)*iplot.GetBinContent(x)
+        sumover+=OtherSys*OtherSys
         if p.GetNbinsY()==1:
             print "%.3f" % sqrt(sumover),"&",
         p.SetBinContent( x,sqrt(sumover) )
-    print "\n=============Final Result=============="
+    print "\n=============Final Result","(adding other systematic uncertainty,",str(OtherSys)+"%)","=============="
     val=Stat.GetY()
     errhi=Stat.GetEYhigh()
     errlo=Stat.GetEYlow()
@@ -118,22 +124,22 @@ def Systematic(ListofPlots,Stat,sysname="sys_tot"):
 
 #DiffBetweenPlots("ZMuMuFit_OldSelect/resultplots.root","ZMuMuFit_OldSelect/resultplots_Counting.root","SEGEff_St","SEGMCTruth")
 
-SEGSysList=[ DiffBetweenPlots(MC_default,MC_Counting,"SEGEff_St","SEGMCTruth"),
+SEGSysList=[ DiffBetweenPlots(MC_default,MC_Counting,"SEGEff","SEGMCTruth"),
 #             DiffBetweenPlots(Data_default,MC_default,"SEGEff_St","SEGDATAMC"),
-             DiffBetweenPlots(Data_default,Data_bkgModel,"SEGEff_St","SEG_BKGModeling"),
-             DiffBetweenPlots(Data_default,Data_sigModel,"SEGEff_St","SEG_SIGModeling"),
-             DiffBetweenPlots(Data_default,Data_CloseByMu,"SEGEff_St","SEG_CloseByMu"),
-             DiffBetweenPlots(Data_default,Data_LooseProbe,"SEGEff_St","SEG_LooseProbe")
+             DiffBetweenPlots(Data_default,Data_bkgModel,"SEGEff","SEG_BKGModeling"),
+             DiffBetweenPlots(Data_default,Data_sigModel,"SEGEff","SEG_SIGModeling"),
+#             DiffBetweenPlots(Data_default,Data_CloseByMu,"SEGEff_St","SEG_CloseByMu"),
+#             DiffBetweenPlots(Data_default,Data_LooseProbe,"SEGEff_St","SEG_LooseProbe")
              ]
 
-LCTSysList=[ DiffBetweenPlots(MC_default,MC_Counting,"LCTEff_St","LCTMCTruth"),
+LCTSysList=[ DiffBetweenPlots(MC_lct_default,MC_lct_Counting,"LCTEff","LCTMCTruth"),
 #             DiffBetweenPlots(Data_default,MC_default,"LCTEff_St","LCTDATAMC"),
-             DiffBetweenPlots(Data_default,Data_bkgModel,"LCTEff_St","LCT_BKGModeling"),
-             DiffBetweenPlots(Data_default,Data_sigModel,"LCTEff_St","LCT_SIGModeling"),
-             DiffBetweenPlots(Data_default,Data_CloseByMu,"LCTEff_St","LCT_CloseByMu"),
-             DiffBetweenPlots(Data_default,Data_LooseProbe,"LCTEff_St","LCT_LooseProbe")
+             DiffBetweenPlots(Data_lct_default,Data_lct_bkgModel,"LCTEff","LCT_BKGModeling"),
+             DiffBetweenPlots(Data_lct_default,Data_lct_sigModel,"LCTEff","LCT_SIGModeling"),
+#             DiffBetweenPlots(Data_default,Data_CloseByMu,"LCTEff_St","LCT_CloseByMu"),
+#             DiffBetweenPlots(Data_default,Data_LooseProbe,"LCTEff_St","LCT_LooseProbe")
              ]
 
 print
-Systematic(SEGSysList, TFile.Open(Data_default).Get("SEGEff_St"), "SEG Total" )
-Systematic(LCTSysList, TFile.Open(Data_default).Get("LCTEff_St"), "LCT Total")
+Systematic(SEGSysList, TFile.Open(Data_default).Get("SEGEff"),2, "SEG Total" )
+Systematic(LCTSysList, TFile.Open(Data_lct_default).Get("LCTEff"),2, "LCT Total")

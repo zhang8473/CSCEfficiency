@@ -24,7 +24,7 @@ from array import array as arr
 Red = arr('d',[0.00, 0.00, 0.00, 1.00, 1.00])
 Green = arr('d',[0.00, 0.10, 1.00, 1.00, 0.00])
 Blue = arr('d',[1.00, 0.90, 0.00, 0.00, 0.00])
-Length = arr('d',[0.00, 0.85, 0.90, 0.95, 1.00])
+Length = arr('d',[0.00, 0.40, 0.60, 0.80, 1.00])
 TColor.CreateGradientColorTable(5,Length,Red,Green,Blue,500)
 gStyle.SetNumberContours(500)
 
@@ -55,8 +55,8 @@ file_out=TFile.Open(ResultPlotsFileName,'RECREATE')
 
 etascheme="abseta"
 #etascheme="tracks_eta"
-#phischeme="shiftedphi"
-phischeme="tracks_phi"
+phischeme="shiftedphi"
+#phischeme="tracks_phi"
 if "pt" in Group:
     binning="pt"
     plotname="tracks_pt_PLOT_"+etascheme+"_bin0_&_"+phischeme+"_bin0"
@@ -164,66 +164,63 @@ if "Stations" in Group:
             Effs.append([0.]*6)
             continue
         f_in=TFile(filename_,"READ");
-        if Postfix=="_MCTruth":
-            Effs.append( GetEff(f_in, "lct_effV"+Postfix,"cnt_eff")+GetEff(f_in,"seg_effV"+Postfix,"cnt_eff") )
-            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",stations[idx][3])
-            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",stations[idx][3])
+        categoryname="cnt_eff" if Postfix=="_MCTruth" else "fit_eff"
+        if "pt" in Group or "eta" in Group or "phi" in Group:
+            LCTEff=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,categoryname,stations[idx][3])
+            SEGEff=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,categoryname,stations[idx][3])
             file_out.cd()
-            if LCTPlot:
-                LCTPlot.Write()
-            if SEGPlot:
-                SEGPlot.Write()
+            if LCTEff:
+                LCTEff.Write()
+            if SEGEff:
+                SEGEff.Write()
         else:
-            Effs.append( GetEff(f_in, "lct_effV"+Postfix,"fit_eff")+GetEff(f_in,"seg_effV"+Postfix,"fit_eff" ) )
-            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",stations[idx][3])
-            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",stations[idx][3])
-            file_out.cd()
-            if LCTPlot:
-                LCTPlot.Write()
-            if SEGPlot:
-                SEGPlot.Write()
-        f_in.Close()
-    Effs=array(Effs).transpose()*100.
-    xval=array(range(1,n_stations+1))*1.0
-    xerr=zeros(n_stations, dtype=float)
-    SegEff=TGraphAsymmErrors(n_stations, xval, array(Effs[0]), xerr, xerr, array(Effs[1]), array(Effs[2]))
-    LCTEff=TGraphAsymmErrors(n_stations, xval, array(Effs[3]), xerr, xerr, array(Effs[4]), array(Effs[5]))
-    SegCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
-    SegCanvas.cd()
-    SegEff.SetMaximum(100)
-    SegEff.SetMinimum(90)
-    LCTEff.SetMaximum(100)
-    LCTEff.SetMinimum(90)
-    SegEff.SetMarkerStyle(8)
-    SegEff.SetMarkerSize(.5)
-    SegEff.Draw("AP")
-    LCTCanvas=TCanvas("lct efficiency","lct efficiency",500,500)
-    LCTCanvas.cd()
-    LCTEff.SetMarkerStyle(8)
-    LCTEff.SetMarkerSize(.5)
-    LCTEff.Draw("AP")
-    for st in range(1,n_stations+1):
-       binnum=SegEff.GetXaxis().FindBin(st)
-       SegEff.GetXaxis().SetBinLabel( binnum,stations[st][1] )
-       LCTEff.GetXaxis().SetBinLabel( binnum,stations[st][1] )
-    file_out.cd()
-    SegEff.Write("SEGEff")
-    LCTEff.Write("LCTEff")
+            Effs.append( GetEff(f_in, "lct_effV"+Postfix,categoryname)+GetEff(f_in,"seg_effV"+Postfix,categoryname) )
+            f_in.Close()
+    if not ("pt" in Group or "eta" in Group or "phi" in Group):
+        Effs=array(Effs).transpose()*100.
+        xval=array(range(1,n_stations+1))*1.0
+        xerr=zeros(n_stations, dtype=float)
+        SEGEff=TGraphAsymmErrors(n_stations, xval, array(Effs[0]), xerr, xerr, array(Effs[1]), array(Effs[2]))
+        LCTEff=TGraphAsymmErrors(n_stations, xval, array(Effs[3]), xerr, xerr, array(Effs[4]), array(Effs[5]))
+        SegCanvas=TCanvas("segment efficiency","segment efficiency",500,500)
+        SegCanvas.cd()
+        SEGEff.SetMaximum(100)
+        SEGEff.SetMinimum(90)
+        LCTEff.SetMaximum(100)
+        LCTEff.SetMinimum(90)
+        SEGEff.SetMarkerStyle(8)
+        SEGEff.SetMarkerSize(.5)
+        SEGEff.Draw("AP")
+        LCTCanvas=TCanvas("lct efficiency","lct efficiency",500,500)
+        LCTCanvas.cd()
+        LCTEff.SetMarkerStyle(8)
+        LCTEff.SetMarkerSize(.5)
+        LCTEff.Draw("AP")
+        for st in range(1,n_stations+1):
+           binnum=SEGEff.GetXaxis().FindBin(st)
+           SEGEff.GetXaxis().SetBinLabel( binnum,stations[st][1] )
+           LCTEff.GetXaxis().SetBinLabel( binnum,stations[st][1] )
+        file_out.cd()
+        if LCTEff:
+           LCTEff.Write("LCTEff")
+        if SEGEff:
+           SEGEff.Write("SEGEff")
 elif "Chambers" in Group:
-    SEGEff=TH2F("SEGEff","segment efficiency",36,1,37,18,-9,9)
+    SEGEff=TH2F("SEGEff","segment efficiency",36,1,37,20,-9,9)
     SEGEff.SetMarkerSize(0.7)
     SEGEff.SetContour(500)
-    SEGEff_upErr=TH2F("SEGEff_upErr","segment efficiency uperror",36,1,37,18,-8.7,9.3)
+    SEGEff_upErr=TH2F("SEGEff_upErr","segment efficiency uperror",36,1,37,20,-8.7,9.3)
     SEGEff_upErr.SetMarkerSize(0.45)
-    SEGEff_downErr=TH2F("SEGEff_downErr","segment efficiency loerror",36,1,37,18,-9.3,8.7)
+    SEGEff_downErr=TH2F("SEGEff_downErr","segment efficiency loerror",36,1,37,20,-9.3,8.7)
     SEGEff_downErr.SetMarkerSize(0.45)
+    SEGEff.GetYaxis().SetTickLength(0)
     Chambers_  = ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36"]
-    Rings_ = ["ME-42","ME-41","ME-32","ME-31","ME-22","ME-21","ME-13","ME-12","ME-11","ME+11","ME+12","ME+13","ME+21","ME+22","ME+31","ME+32","ME+41","ME+42"]
+    Rings_ = ["ME-42","ME-41","ME-32","ME-31","ME-22","ME-21","ME-13","ME-12","ME-11B","ME-11A","ME+11A","ME+11B","ME+12","ME+13","ME+21","ME+22","ME+31","ME+32","ME+41","ME+42"]
     for ich in range(36):
         SEGEff.GetXaxis().SetBinLabel(ich+1,Chambers_[ich])
         SEGEff_upErr.GetXaxis().SetBinLabel(ich+1,Chambers_[ich])
         SEGEff.GetXaxis().SetBinLabel(ich+1,Chambers_[ich])
-    for irg in range(18):
+    for irg in range(20):
         SEGEff.GetYaxis().SetBinLabel(irg+1,Rings_[irg])
         SEGEff_upErr.GetYaxis().SetBinLabel(irg+1,Rings_[irg])
         SEGEff_downErr.GetYaxis().SetBinLabel(irg+1,Rings_[irg])
@@ -231,7 +228,8 @@ elif "Chambers" in Group:
     LCTEff.SetTitle("LCT efficiency")
     LCTEff_upErr=SEGEff_upErr.Clone("LCTEff_upErr")
     LCTEff_downErr=SEGEff_downErr.Clone("LCTEff_downErr")
-    RingToYMap={(1,1):0,(1,2):1,(1,3):2,(2,1):3,(2,2):4,(3,1):5,(3,2):6,(4,1):7,(4,2):8}
+    LCTEff.GetYaxis().SetTickLength(0)
+    RingToYMap={(1,4):0,(1,1):1,(1,2):2,(1,3):3,(2,1):4,(2,2):5,(3,1):6,(3,2):7,(4,1):8,(4,2):9}
   #split tree to chamber
     for idx in range(n_chambers):
         ec=chambers[idx][2] == '+'
@@ -250,13 +248,13 @@ elif "Chambers" in Group:
             Effs=GetEff(f_in, "lct_effV"+Postfix,"fit_eff")+GetEff(f_in,"seg_effV"+Postfix,"fit_eff" )
         f_in.Close()
         iBin_y=RingToYMap[(st,rg)]
-        iBin_y=10+iBin_y if ec else 9-iBin_y
-        SEGEff.SetBinContent(ch,iBin_y,Effs[0]*100.);
-        SEGEff_downErr.SetBinContent(ch,iBin_y,Effs[1]*100.);
-        SEGEff_upErr.SetBinContent(ch,iBin_y,Effs[2]*100.);
-        LCTEff.SetBinContent(ch,iBin_y,Effs[3]*100.);
-        LCTEff_downErr.SetBinContent(ch,iBin_y,Effs[4]*100.);
-        LCTEff_upErr.SetBinContent(ch,iBin_y,Effs[5]*100.);
+        iBin_y=11+iBin_y if ec else 10-iBin_y
+        LCTEff.SetBinContent(ch,iBin_y,Effs[0]*100.);
+        LCTEff_downErr.SetBinContent(ch,iBin_y,Effs[1]*100.);
+        LCTEff_upErr.SetBinContent(ch,iBin_y,Effs[2]*100.);
+        SEGEff.SetBinContent(ch,iBin_y,Effs[3]*100.);
+        SEGEff_downErr.SetBinContent(ch,iBin_y,Effs[4]*100.);
+        SEGEff_upErr.SetBinContent(ch,iBin_y,Effs[5]*100.);
     SegCanvas=TCanvas("segment efficiency","segment efficiency",1500,1000)
     SegCanvas.cd()
     SEGEff.Draw("COLZ,TEXT")
@@ -280,28 +278,21 @@ elif "Chambers" in Group:
     LCTEff.Write()
     LCTEff_upErr.Write()
     LCTEff_downErr.Write()
-else:
+elif "pt" in Group or "eta" in Group or "phi" in Group:
     filename_=Prefix+TagProbeFitResult+"AllStations.root"
     if not os.path.isfile(filename_):
         print filename_+" is not found, skip.. "
     else:
         f_in=TFile(filename_,"READ");
-        if Postfix=="_MCTruth":
-            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"cnt_eff",1)
-            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"cnt_eff",1)
-            file_out.cd()
-            if LCTPlot:
-                LCTPlot.Write()
-            if SEGPlot:
-                SEGPlot.Write()
-        else:
-            LCTPlot=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,"fit_eff",1)
-            SEGPlot=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,"fit_eff",1)
-            file_out.cd()
-            if LCTPlot:
-                LCTPlot.Write()
-            if SEGPlot:
-                SEGPlot.Write()
+        categoryname="cnt_eff" if Postfix=="_MCTruth" else "fit_eff"
+        LCTEff=GetBinnedEffPlot(f_in, "lct_effV"+Postfix,categoryname,stations[idx][3])
+        SEGEff=GetBinnedEffPlot(f_in, "seg_effV"+Postfix,categoryname,stations[idx][3])
         f_in.Close()
+        file_out.cd()
+        if LCTEff:
+           LCTEff.Write("LCTEff")
+        if SEGEff:
+           SEGEff.Write("SEGEff")
 #raw_input("Plots are saved in "+ResultPlotsFileName+". Press ENTER to exit")
+print "Plots are saved in",ResultPlotsFileName+"."
 file_out.Close()

@@ -71,9 +71,10 @@ process.TagProbeFitTreeAnalyzer = cms.EDAnalyzer("TagProbeFitTreeAnalyzer",
     Variables = cms.PSet(
         invMass    = cms.vstring("Tag-Probe Mass", "75", "110", "GeV/c^{2}") if IsZPeak else cms.vstring("Tag-Probe Mass", "2.5", "3.6", "GeV/c^{2}"),
         tracks_pt  = cms.vstring("Probe p_{T}", "0", "1000", "GeV/c"),
-        tracks_eta = cms.vstring("Probe #eta", "-2.5", "2.5", ""),
-#        abseta     = cms.vstring("Probe #eta", "0.", "4.8", ""),
-        tracks_phi = cms.vstring("Probe #phi", "0.", "6.32", ""),
+#       tracks_eta = cms.vstring("Probe #eta", "-2.5", "2.5", ""),
+        abseta     = cms.vstring("Probe |#eta|", "0.", "2.5", ""),
+        shiftedphi = cms.vstring("Probe #phi", "-0.0872664626", "6.28318531", ""),
+#       tracks_phi = cms.vstring("Probe #phi", "0.", "6.32", ""),
         tracks_e   = cms.vstring("Probe p", "1.", "1000.", "GeV/c"),
         weight = cms.vstring("weight","0","1000.","")
     ),
@@ -135,8 +136,9 @@ exec( "process.TagProbeFitTreeAnalyzer.Categories = cms.PSet( foundLCTSt%d  = cm
 
 EfficiencyBins = cms.PSet(
             tracks_pt        = cms.vdouble(ptbin),
-            tracks_eta        = cms.vdouble(etabin),
-            tracks_phi       = cms.vdouble(phibin)
+            abseta        = cms.vdouble(etabin),
+            #tracks_phi       = cms.vdouble(phibin)
+            shiftedphi = cms.vdouble(phibin)
 )
 #the name of the parameter set becomes the name of the directory
 process.TagProbeFitTreeAnalyzer.Efficiencies = cms.PSet(
@@ -187,7 +189,7 @@ if CalculateSystematic and (not RunOnMC):
 if RunOnMC: # BinToPDFmap has to be defined, otherwise it will crash. Problems are in TagProbeFitTreeAnalyzer. Only the CntEfficiency (counting) will be used later.
     process.TagProbeFitTreeAnalyzer.Categories = cms.PSet(
         process.TagProbeFitTreeAnalyzer.Categories,
-        mcTrue = cms.vstring("MCtrue", "dummy[true=1,false=0]")
+        mcTrue = cms.vstring("mcTrue", "dummy[true=1,false=0]")
         )
     process.TagProbeFitTreeAnalyzer.Efficiencies = cms.PSet(
         process.TagProbeFitTreeAnalyzer.Efficiencies,

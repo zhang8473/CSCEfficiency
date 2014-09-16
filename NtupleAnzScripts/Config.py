@@ -3,7 +3,8 @@
 ########################
 RunOnMC=False
 Resonance="Z"#options are "Z","JPsi"
-Group="Stationspt"#options are "Chambers","Stations","pt","eta","phi","Stationspt","Stationseta","Stationsphi"
+#Group="Chambers"#options are "Chambers","Stations","pt","eta","phi","Stationspt","Stationseta","Stationsphi"
+Group="Stationsphi"#options are "Chambers","Stations","pt","eta","phi","Stationspt","Stationseta","Stationsphi"
 CalculateSystematic=False#whether calculate the systematic for data; for MC, it will be turned off automatically
 DataPileupRootFileName="CMSRun2012C_Cert_201554-202305_8TeV_PromptReco_Collisions12_JSON_MuonPhys.root"
 pileup_mc=[2.344E-05,2.344E-05,2.344E-05,2.344E-05,4.687E-04,4.687E-04,7.032E-04,9.414E-04,1.234E-03,1.603E-03,2.464E-03,3.250E-03,5.021E-03,6.644E-03,8.502E-03,1.121E-02,1.518E-02,2.033E-02,2.608E-02,3.171E-02,3.667E-02,4.060E-02,4.338E-02,4.520E-02,4.641E-02,4.735E-02,4.816E-02,4.881E-02,4.917E-02,4.909E-02,4.842E-02,4.707E-02,4.501E-02,4.228E-02,3.896E-02,3.521E-02,3.118E-02,2.702E-02,2.287E-02,1.885E-02,1.508E-02,1.166E-02,8.673E-03,6.190E-03,4.222E-03,2.746E-03,1.698E-03,9.971E-04,5.549E-04,2.924E-04,1.457E-04,6.864E-05,3.054E-05,1.282E-05,5.081E-06,1.898E-06,6.688E-07,2.221E-07,6.947E-08,2.047E-08]
@@ -11,12 +12,12 @@ pileup_mc=[2.344E-05,2.344E-05,2.344E-05,2.344E-05,4.687E-04,4.687E-04,7.032E-04
 #pileup_mc=mix.input.nbPileupEvents.probValue
 TreeName="Fraction"
 sampleweight=1.
-ptbin=[5,10,20,40,60,80,100,200,500,1000]; #pt binning
-etabin1=[ 0,0.9,1.1,1.2,1.3,1.5,1.7,1.9,2.1,2.4 ]; #station 1 eta binning: ME13 0.9-1.1, ME12 1.2-1.7, ME11 1.7-2.4
-etabin2=[ 0,0.9,1.0,1.3,1.6,2.0,2.4 ];#station 2 eta binning:ME22 1.0-1.6, ME21 1.6-2.4
-etabin3=[ 0,0.9,1.1,1.3,1.5,1.7,2.1,2.4 ]#station 3 eta binning:ME32 1.1-1.7, ME31 1.7-2.4
-etabin4=[ 0,0.9,1.2,1.5,1.8,2.1,2.4 ]#station 4 eta binning:ME41 1.8-2.4, ME42 1.2-1.8
-phibin=[ x*0.35 for x in range(19) ]; #phi binning: 18/36 chambers-->18bins
+ptbin=[3,6,10,20,40,60,80,100,200,500,1000] #pt binning
+etabin1=[ 0,0.85,1.18,1.3,1.5,1.7,1.9,2.1,2.4 ] #station 1 eta binning 
+etabin2=[ 0,0.95,1.2,1.4,1.6,1.8,2.0,2.2,2.4 ] #station 2 eta binning
+etabin3=[ 0,0.9,1.08,1.3,1.5,1.72,1.9,2.2,2.4 ] #station 3 eta binning
+etabin4=[ 0,0.9,1.15,1.4,1.6,1.78,2.0,2.2,2.4 ] #station 4 eta binning
+phibin=[-0.0872664626+x*0.698131701 for x in range(10)] #phi binning: 18/36 chambers-->9bins, 0 deg points at ring 2, chamber 1 center
 
 ########################################################################################
 # Temporary output files --- find enough space to have them (about the input file size)#
@@ -31,16 +32,18 @@ TemporaryOutputFile="/tmp/Tmp_"+dir_+".root"#New branches will be added to the o
 # A normal user is not supposed to change anything below  #
 ###########################################################
 #---note: The logical expressions are in C style
-DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCDyErrProjHVGap# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# )"#default
-ProbeSegment="( CSCDxyTTSeg#<5. || CSCDxyTTSeg#<5*CSCDxyErrTTSeg# )"# tight cut
-ProbeLCT="( CSCDxyTTLCT#<40. && CSCDxyTTLCT#>0. )"#default
+DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCDyErrProjHVGap# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# && !trackVeto_isClosestToLCT )"#for LCT efficiency, with closest to LCT requirement
+#DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCDyErrProjHVGap# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# )"#for segment efficiency, without closest to LCT requirement
+#if there is no LCT or segment, the distance values are filled as -9999.
+ProbeSegment="( (CSCDxyTTSeg#<5. || CSCDxyTTSeg#<5*CSCDxyErrTTSeg#) && CSCDxyTTSeg#>0.)"# tight cut
+ProbeLCT="( (CSCDxyTTLCT#<5. || CSCDxyTTLCT#<5*CSCDxyErrTTLCT#) && CSCDxyTTLCT#>0. )"# tight cut
 
 #DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && dRTkMu# > 0.2 ) "#old one
 #DenominatorRequire="( !CSCCBad# && CSCProjDistEdge#<-5 &&  CSCProjDistEdge#> -100 && dRTkMu# < 10. && CSCDyProjHVGap#>1. && CSCDyProjHVGap#>3*CSCyErrProjLc# && CSCProjDistEdge#<-3*CSCProjDistErrEdge# ) "# for calculate systematic: close-by muons
 #ProbeSegment="( CSCDrTTSeg#<200. && CSCDrTTSeg#>0.)"# for calculate systematic: Segment to TT distance cut
 #ProbeLCT="( CSCDrTTLCT#<200. && CSCDrTTLCT#>0. )"# for calculate systematic: LCT to TT distance cut
 #ProbeSegment="( CSCDxyTTSeg#<40. && CSCDxyTTSeg#>0.)"#default
-#ProbeLCT="( CSCDxyTTLCT#<5. || CSCDxyTTLCT#<5*CSCDxyErrTTLCT# )"# tight cut
+#ProbeLCT="( CSCDxyTTLCT#>0. )"#default
 
 
 if Resonance is "Z":
@@ -115,22 +118,13 @@ elif "Chambers" in Group:
   chambers=[]
   for ec_ in (True,False):
     for st_ in (1,2,3,4):
-      if st_==1:
-        maxrg_=4
-      else:
-        maxrg_=3
-
-      for rg_ in range(1,maxrg_):
-        if st_!=1 and rg_==1:
+      for rg_ in range(1,5) if st_==1 else range(1,3):
+        if st_!=1 and rg_==1: #ME21,31,41 have 18 chambers
           chambers_=range(1,19)
-        elif st_==4 and rg_==2:
-          if ec_:
-            chambers_=(9,10,11,12,13)
-          else:
-            chambers_=()
-        else:
+        elif st_==4 and rg_==2: #ME42 has 5 chambers on the plus side
+          chambers_=(9,10,11,12,13) if ec_ else ()
+        else: #ME11,12,13,22,32 have 36 chambers
           chambers_=range(1,37)
-
         for ch_ in chambers_:
           chambers.append( "ME%s%d_%d_%d"%( '+' if (ec_) else '-', st_, rg_, ch_ ) )
   n_chambers=len(chambers)
@@ -156,3 +150,14 @@ def ConvertCLogicalExp(Expression_):
 
 
 print "Binning: \n\033[93m pt:",ptbin,"\n\033[95m Station 1 eta:",etabin1,"\n Station 2 eta:",etabin2,"\n Station 3 eta:",etabin3,"\n Station 4 eta:",etabin4,"\n \033[97mphi:",phibin,"\033[0m"
+
+def Getch():
+  import sys, tty, termios
+  fd = sys.stdin.fileno()
+  old_settings = termios.tcgetattr(fd)
+  try:
+    tty.setraw(sys.stdin.fileno())
+    ch = sys.stdin.read(1)
+  finally:
+    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+  return ch
