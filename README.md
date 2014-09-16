@@ -27,7 +27,7 @@ scramv1 b
 </pre>
 
 ## Make the Ntuple
-1. Config the variable `datatype` in [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py): 
+1. Config the variable `datatype` in [NtupleMaker.py](NtupleMaker.py): 
 <pre>datatype="RAW"#
 #Candidates are for data: "RAW" "RAW-RECO" "FEVT"
 #for mc: in order of suggestions: "GEN-RAWDEBUG"(mc) "GEN-SIM-RAW"(mc) "GEN-RAW"(mc) "GEN-SIM"
@@ -37,13 +37,13 @@ The default output file name is 'CSCPFG_Ineff_DATA.root' ---
 process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 </pre>
 
-2. Run [NtupleMaker.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleMaker.py) using Crab or locally. After all jobs finished, combine the output root files into one:
+2. Run [NtupleMaker.py](NtupleMaker.py) using Crab or locally. After all jobs finished, combine the output root files into one:
 <pre>
 hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 </pre>
 
 ## Make the Efficiency plots
-1. Setup  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
+1. Setup  [Config.py](NtupleAnzScripts/Config.py).
    1. Setup for Data or for MC:
    <pre>
     RunOnMC=False # or True
@@ -113,7 +113,7 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 5. Plots are in the result root file
 
 ## Organize the Result Plots
-To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/DATAMCPlot.py). It oragnizes the plots made by [Step2_PlotAll.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Step2_PlotAll.py). The usage is
+To combine the data and MC results into one plot, one can use [DATAMCPlot.py](NtupleAnzScripts/DATAMCPlot.py). It oragnizes the plots made by [Step2_PlotAll.py](NtupleAnzScripts/Step2_PlotAll.py). The usage is
 <pre>
 python DATAMCPlot.py datafile mcfile plotname
 </pre>
@@ -121,11 +121,11 @@ python DATAMCPlot.py datafile mcfile plotname
 * mcfile is the result root file from simulation. If the keyword `MCTruth` appears in the file name, the simulation couting efficiency for real muons will be plotted. In that case, the plotname will be changed to plotname+"_MCTruth" automatically in the script. So one should still use the same plotname while calculating MCTruth.
 * plotname is the name of the plot saved in the result root file, e.g. "ME12+13seg_effV" for segment efficiency or "ME12+13lct_effV" for lct efficiency.
 
-I suggest to put the datafile and the mcfile in different directories. This script will use the  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py) in the datafile directory. If no Config.py or no \__init\__.py is found in the datafile directory, it will use the Config.py in the current directory.
+I suggest to put the datafile and the mcfile in different directories. This script will use the  [Config.py](NtupleAnzScripts/Config.py) in the datafile directory. If no Config.py or no \__init\__.py is found in the datafile directory, it will use the Config.py in the current directory.
 
 ## Study the Variables in the Ntuple
 This part is only for **experts** who want to find out a problem or know more. Here only list a breif discription for each script because **experts** are able to read the python script themselves. With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
-* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) can be used to study the variables in category of stations. While using this, the `Group` should be set to "Stations" in [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
-* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) can be used to study the variables in category of chambers. While using this, the `Group` should be set to "Chambers" in [Config.py](NtupleAnzScripts/Config.py).
+* [MatchStudy.py](NtupleAnzScripts/ExpertsOnly/MatchStudy.py) can be used to study the variables in category of stations. While using this, the `Group` should be set to "Stations" in [Config.py](NtupleAnzScripts/Config.py).
+* [MatchStudy_Chamber.py](NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) can be used to study the variables in category of chambers. While using this, the `Group` should be set to "Chambers" in [Config.py](NtupleAnzScripts/Config.py).
 * [RateStudy.py](NtupleAnzScripts/ExpertsOnly/RateStudy.py) can be used to study the simulation truth counting efficiency versus any variables in the Ntuple. The purpose is to find out the correlations between the efficiency and variables in the Ntuple.
 * [Systematic1D.py](NtupleAnzScripts/ExpertsOnly/ Systematic1D.py) is to calculate the systematic uncertainties from different sources and get the final results with both systematic and statistic uncertainties. The input files are the plots made by [Step2_PlotAll.py](NtupleAnzScripts/Step2_PlotAll.py). See [the advanced usage](#organize-the-result-plots) of [Step2_PlotAll.py](NtupleAnzScripts/Step2_PlotAll.py):
