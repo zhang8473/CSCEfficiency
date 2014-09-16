@@ -32,7 +32,7 @@ scramv1 b
 #Candidates are for data: "RAW" "RAW-RECO" "FEVT"
 #for mc: in order of suggestions: "GEN-RAWDEBUG"(mc) "GEN-SIM-RAW"(mc) "GEN-RAW"(mc) "GEN-SIM"
 </pre>
-The The default output file name is 'CSCPFG_Ineff_DATA.root' ---
+The default output file name is 'CSCPFG_Ineff_DATA.root' ---
 <pre>
 process.aoddump.rootFileName=cms.untracked.string('CSCPFG_Ineff_DATA.root')
 </pre>
@@ -77,7 +77,7 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
       <td>"Stationsphi"</td><td>ϕ</td><td>efficiency</td><td></td><td>make a plot for each station</td>
     </tr>
     <tr>
-      <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations</td>
+      <td>"pt","eta", or "phi"</td><td>pt,|η|,ϕ</td><td>efficiency</td><td></td><td>make one plot for all stations, not tested yet</td>
     </tr>
    </table> 
    4. Arrange space for the temporary file (you may change the path but not the file name): 
@@ -105,7 +105,7 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
    Advanced Usage of [Step2_PlotAll.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Step2_PlotAll.py):
    <pre> python Step2_PlotAll.py arg1 arg2 </pre>
    * arg1 is the name of the directory that stores the TagandProbe result files;
-   * arg2: "lct_effV"+arg2 and "seg_effV"+arg2 are the root TDirectory name in the TagandProbe result root file. arg2 can be specified as "bkg" or "sig" for background and signal modeling;
+   * arg2 is the postfix of the root TDirectory name in the TagandProbe result root file, for lct, the TDirectory name is "lct_effV"+arg2 and for segment, the TDirectory name is "seg_effV"+arg2. Moreover, arg2 can also be specified as "bkg" or "sig" for background and signal modeling;
    * Example1(plot default efficiencies): python Step2_PlotAll.py
    * Example2(for systematic -- bkg modeling): python Step2_PlotAll.py . bkg
    * Example3(for systematic -- sig modeling): python Step2_PlotAll.py . sig
@@ -113,10 +113,18 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 5. Plots are in the result root file
 
 ## Organize the Result Plots
-To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/DATAMCPlot.py).
+To combine the data and MC results into one plot, one can use [DATAMCPlot.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/DATAMCPlot.py). It oragnizes the plots made by [Step2_PlotAll.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Step2_PlotAll.py). The usage is
+<pre>
+python DATAMCPlot.py datafile mcfile plotname
+</pre>
+* datafile is the result root file from data;
+* mcfile is the result root file from simulation. If the keyword `MCTruth` appears in the file name, the simulation couting efficiency for real muons will be plotted. In that case, the plotname will be changed to plotname+"_MCTruth" automatically in the script. So one should still use the same plotname while calculating MCTruth.
+* plotname is the name of the plot saved in the result root file, e.g. "ME12+13seg_effV" for segment efficiency or "ME12+13lct_effV" for lct efficiency.
+
+I suggest to put the datafile and the mcfile in different directories. This script will use the  [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py) in the datafile directory. If no Config.py or no \__init\__.py is found in the datafile directory, it will use the Config.py in the current directory.
 
 ## Study the Variables in the Ntuple
-With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
-* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) is for stations
-* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) is for one or multiple chambers.
-
+This part is only for **experts** who want to find out a problem or know more. Here only list a breif discription for each script because **experts** are able to read the python script themselves. With the following python scipts, one can study the variables and their correlations in the Ntuple, e.g., the distance between the track and the LCT/segment.
+* [MatchStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy.py) can be used to study the variables in category of stations. While using this, the `Group` should be set to "Stations" in [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
+* [MatchStudy_Chamber.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/MatchStudy_Chamber.py) can be used to study the variables in category of chambers. While using this, the `Group` should be set to "Chambers" in [Config.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/Config.py).
+* [RateStudy.py](https://github.com/zhang8473/CSCEfficiency/blob/master/NtupleAnzScripts/ExpertsOnly/RateStudy.py) can be used to study the simulation truth counting efficiency versus any variables in the Ntuple. The purpose is to find out the correlations between the efficiency and variables in the Ntuple.
