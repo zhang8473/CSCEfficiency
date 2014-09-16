@@ -102,7 +102,7 @@ hadd Ntuple.root CSCPFG_Ineff_DATA*.root
 3. Wait until all jobs finished. Use `ps -f` to check.
 4. Make the plot:
    <pre> python Step2_PlotAll.py </pre>
-   Advanced Usage of [Step2_PlotAll.py](NtupleAnzScripts/Step2_PlotAll.py):
+   [](Advanced-Usage-of) Advanced Usage of [Step2_PlotAll.py](NtupleAnzScripts/Step2_PlotAll.py):
    <pre> python Step2_PlotAll.py arg1 arg2 </pre>
    * arg1 is the name of the directory that stores the TagandProbe result files;
    * arg2 is the postfix of the root TDirectory name in the TagandProbe result root file, for lct, the TDirectory name is "lct_effV"+arg2 and for segment, the TDirectory name is "seg_effV"+arg2. Moreover, arg2 can also be specified as "bkg" or "sig" for background and signal modeling;
